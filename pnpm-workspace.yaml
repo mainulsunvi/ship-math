@@ -1,5 +1,6 @@
 packages:
-  - 'extensions/*'
+  - extensions/*
+
 allowBuilds:
   '@parcel/watcher': true
   '@prisma/client': true
@@ -7,3 +8,11 @@ allowBuilds:
   esbuild: true
   prisma: true
   unrs-resolver: true
+
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - esbuild
+  - prisma
+  - unrs-resolver
