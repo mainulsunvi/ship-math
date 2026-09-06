@@ -4,7 +4,7 @@ import ShipMathPage from "../components/global/ShipMathPage";
 
 export default function SettingsPage() {
   return (
-    <ShipMathPage title="Settings">
+    <ShipMathPage title="Settings" backAction={{ content: "Dashboard", url: "/app" }}>
       <Layout>
         <Layout.Section>
           <Card>

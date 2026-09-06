@@ -8,6 +8,8 @@
  * Every write entry point validates its input with StoredRuleSchema.
  */
 
+import { randomBytes } from "node:crypto";
+
 import prisma, { Prisma } from "../../db.server";
 import { StoredRuleSchema, type RuleInput } from "../config-schema";
 import type { ShippingRule, Zone } from "@prisma/client";
@@ -25,6 +27,53 @@ const RULE_ORDER: Prisma.ShippingRuleOrderByWithRelationInput[] = [
   { id: "asc" },
 ];
 
+/** Base36 alphabet (0-9 then a-z) for the public rule uid. */
+const UID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/** Retries on a uid unique collision before insertWithUniqueUid gives up. */
+const UID_COLLISION_RETRIES = 3;
+
+/**
+ * Short public uid for URLs/logs: 10 lowercase base36 chars from crypto
+ * randomness (~36^10 space — collision-safe at our scale; any collision
+ * still retries below). Generated server-side only, never parsed from
+ * client input.
+ */
+function generateRuleUid(): string {
+  return Array.from(randomBytes(10))
+    .map(function toBase36Char(byte: number) {
+      return UID_ALPHABET[byte % 36];
+    })
+    .join("");
+}
+
+/**
+ * Insert a rule row with a freshly minted uid, retrying with a fresh uid
+ * on a unique collision (P2002). uid is the only unique constraint a rule
+ * create can hit — id is a non-colliding cuid — so P2002 here is always a
+ * uid clash (practically impossible at 36^10). Shared by createRule and
+ * duplicateRule so a copy never inherits the source's uid.
+ */
+async function insertWithUniqueUid(
+  client: Prisma.TransactionClient,
+  data: Prisma.ShippingRuleUncheckedCreateInput,
+): Promise<ShippingRule> {
+  let lastCollision: unknown;
+  for (let attempt = 0; attempt <= UID_COLLISION_RETRIES; attempt += 1) {
+    try {
+      return await client.shippingRule.create({ data: { ...data, uid: generateRuleUid() } });
+    } catch (error) {
+      const isUidCollision = error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+      if (!isUidCollision) {
+        throw error;
+      }
+      lastCollision = error;
+    }
+  }
+  throw lastCollision;
+}
+
+/** Full scalar rows in RULE_ORDER (uid included — no trimmed mapper). */
 export async function listRules(shopId: string, page = 1): Promise<{ rules: ShippingRule[]; total: number }> {
   const safePage = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1;
   const [rules, total] = await prisma.$transaction([
@@ -52,18 +101,29 @@ export async function createRule(shopId: string, input: RuleInput): Promise<Ship
   if (parsed.zoneId !== null && parsed.zoneId !== undefined) {
     await assertZoneInShop(shopId, parsed.zoneId);
   }
-  return prisma.shippingRule.create({
-    data: {
-      shopId,
-      name: parsed.name,
-      kind: parsed.kind,
-      priority: parsed.priority,
-      stopOnMatch: parsed.stopOnMatch,
-      zoneId: parsed.zoneId ?? null,
-      conditions: JSON.stringify(parsed.conditions),
-      action: JSON.stringify(parsed.action),
-    },
+  return insertWithUniqueUid(prisma, {
+    shopId,
+    name: parsed.name,
+    kind: parsed.kind,
+    priority: parsed.priority,
+    stopOnMatch: parsed.stopOnMatch,
+    zoneId: parsed.zoneId ?? null,
+    conditions: JSON.stringify(parsed.conditions),
+    action: JSON.stringify(parsed.action),
   });
+}
+
+/**
+ * Fetch a rule by its public uid (dedicated rule routes). Shop-scoped: a uid
+ * owned by ANOTHER shop returns null exactly like an unknown uid, so
+ * cross-shop rules never leak through uid-addressed routes.
+ */
+export async function getRuleByUid(shopId: string, uid: string): Promise<ShippingRule | null> {
+  const rule = await prisma.shippingRule.findUnique({ where: { uid } });
+  if (rule === null || rule.shopId !== shopId) {
+    return null;
+  }
+  return rule;
 }
 
 export async function updateRule(shopId: string, id: string, input: RuleInput): Promise<ShippingRule> {
@@ -75,6 +135,7 @@ export async function updateRule(shopId: string, id: string, input: RuleInput): 
   if (parsed.zoneId !== null && parsed.zoneId !== undefined) {
     await assertZoneInShop(shopId, parsed.zoneId);
   }
+  // uid is immutable after create — StoredRuleSchema strips any smuggled uid from the input, and this payload never includes it.
   return prisma.shippingRule.update({
     where: { id },
     data: {
@@ -101,7 +162,8 @@ export async function deleteRule(shopId: string, id: string): Promise<void> {
 
 /**
  * Duplicate (spec 005 criterion 3): copy named "<name> (copy)", enabled:
- * false, inserted DIRECTLY AFTER the source in evaluation order.
+ * false, inserted DIRECTLY AFTER the source in evaluation order. The copy
+ * gets its OWN freshly minted uid — the source's uid is never reused.
  *
  * Exact insertion rule (documented per plan; tested in
  * app/lib/repositories/__tests__/rules.test.ts). Let s = source.priority and
@@ -146,18 +208,16 @@ export async function duplicateRule(shopId: string, id: string): Promise<Shippin
         data: { priority: { increment: 1 } },
       });
     }
-    return tx.shippingRule.create({
-      data: {
-        shopId,
-        name: `${source.name} (copy)`,
-        enabled: false,
-        kind: parsed.kind,
-        priority: sourcePriority + 1,
-        stopOnMatch: parsed.stopOnMatch,
-        zoneId: parsed.zoneId ?? null,
-        conditions: JSON.stringify(parsed.conditions),
-        action: JSON.stringify(parsed.action),
-      },
+    return insertWithUniqueUid(tx, {
+      shopId,
+      name: `${source.name} (copy)`,
+      enabled: false,
+      kind: parsed.kind,
+      priority: sourcePriority + 1,
+      stopOnMatch: parsed.stopOnMatch,
+      zoneId: parsed.zoneId ?? null,
+      conditions: JSON.stringify(parsed.conditions),
+      action: JSON.stringify(parsed.action),
     });
   });
 }

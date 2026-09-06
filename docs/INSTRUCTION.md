@@ -24,7 +24,7 @@
 ## UI/UX (Polaris)
 - Use **Polaris React** components throughout the app.
 - Build reusable UI components inside `app/components/` and reuse them wherever applicable instead of duplicating markup/logic.
-- Prefer **modals** over custom routes for UI/UX flows and forms.
+- Prefer **modals** over custom routes for UI/UX flows and forms — EXCEPT rules: rule create/edit live on dedicated routes (`/app/rules/new`, `/app/rules/:uid/edit`) with the shared `RuleForm` component, addressed by the rule's public `uid` (user decision 2026-09-07).
 - **Boolean toggles always use the Switch component** (`app/components/ui/Switch.tsx`) — never Checkbox, Polaris SettingToggle, or button-based toggles (user directive 2026-09-06).
 
 ## Forms

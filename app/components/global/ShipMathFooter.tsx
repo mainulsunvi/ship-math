@@ -13,11 +13,7 @@ export default function ShipMathFooter() {
       }}
     >
       Built with ❤️ by{" "}
-      <LinkText
-        href="https://www.pixelfic.com"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+      <LinkText href="https://www.pixelfic.com" target="_blank">
         <b>Pixelfic Inc.</b>
       </LinkText>
       &nbsp; &copy; {new Date().getFullYear()}
@@ -25,14 +21,13 @@ export default function ShipMathFooter() {
   );	
 }
 
-function LinkText({ children, href, target, rel }: {
+function LinkText({ children, href, target }: {
     children: React.ReactNode;
     href: string;
-    target?: string;
-    rel?: string;
+    target?: "_blank" | "_self" | "_parent" | "_top";
   }) {
     return (
-      <Link url={href} target={target} rel={rel} removeUnderline>
+      <Link url={href} target={target} removeUnderline>
         {children}
       </Link>
     );

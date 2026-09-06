@@ -31,7 +31,9 @@ export default function App() {
           Dashboard
         </Link>
         <Link to="/app/zones">Zones</Link>
+        <Link to="/app/rules">Rules</Link>
         <Link to="/app/settings">Settings</Link>
+        <Link to="/app/contact">Contact Us</Link>
       </NavMenu>
       <ShipMathNav />
       <Outlet />

@@ -116,6 +116,31 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
 - ✅ Convention recorded in docs/INSTRUCTION.md (UI/UX section): boolean
   toggles always use `app/components/ui/Switch.tsx`.
 
+---
+
+## Rules on routes + public uid — Orchestrator run 2026-09-07 (user decision)
+
+- ✅ Backend (agent): `ShippingRule.uid String? @unique` + migration
+  `20260906184713_rule_uid` (with randomblob backfill for pre-existing rows);
+  `generateRuleUid()` 10-char base36 in `repositories/rules.ts`; `createRule`/
+  `duplicateRule` mint fresh uids (P2002 retry ×3); NEW `getRuleByUid(shopId,
+  uid)` (cross-shop → null); `updateRule` ignores smuggled uid changes; 5 new
+  tests. Prisma client regenerated.
+- ✅ Frontend (orchestrator-implemented — GLM subagent rate-limited): NEW
+  `app/components/rules/RuleForm.tsx` (modal's form logic verbatim; Card
+  sections Basics / IF / THEN; create+edit in one component), NEW
+  `app/routes/app.rules.new.tsx` (rule-create orchestration verbatim), NEW
+  `app/routes/app.rules.$uid.edit.tsx` (loader via getRuleByUid → 404 on
+  miss/foreign uid; rule-update orchestration; "ID: <uid>" shown on page);
+  dashboard rewired (New rule → route, onEdit → `/app/rules/<uid>/edit`,
+  modal state removed, RuleRow carries uid); `RuleEditorModal.tsx` DELETED;
+  ShipMathPage gained backAction passthrough. Gates: tsc 0 · vitest 145/145 ·
+  vite build clean.
+- ✅ Convention recorded in docs/INSTRUCTION.md: rules are route-based
+  (exception to modals-over-routes); zones/other flows stay modal.
+- Reviewer pass pending (rate-limited session) — flag for next orchestrator
+  run to append verdict.
+
 ## 002 — Data model & config store — ✅ (this lane)
 
 - ✅ Prisma models: `Shop`, `Zone`, `ShippingRule`, `RequestLog`, `AuditLog`, `AiUsageDay`

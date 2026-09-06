@@ -7,6 +7,7 @@ interface ShipMathPageProps {
   subtitle?: string;
   primaryAction?: PageProps["primaryAction"];
   secondaryActions?: PageProps["secondaryActions"];
+  backAction?: PageProps["backAction"];
   children: ReactNode;
 }
 
@@ -20,16 +21,20 @@ export default function ShipMathPage({
   subtitle,
   primaryAction,
   secondaryActions,
+  backAction,
   children,
 }: ShipMathPageProps) {
   return (
-    <Page
-      title={title}
-      subtitle={subtitle}
-      primaryAction={primaryAction}
-      secondaryActions={secondaryActions}
-    >
-      {children}
-    </Page>
+    <Box>
+      <Page
+        title={title}
+        subtitle={subtitle}
+        primaryAction={primaryAction}
+        secondaryActions={secondaryActions}
+        backAction={backAction}
+      >
+        {children}
+      </Page>
+    </Box>
   );
 }

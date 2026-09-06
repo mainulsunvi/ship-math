@@ -76,6 +76,7 @@ model Zone {
 
 model ShippingRule {
   id          String    @id @default(cuid())
+  uid         String?   @unique // short public id for URLs/logs (backfilled; always set on create)
   shopId      String
   shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name        String

@@ -38,7 +38,8 @@ interface FieldMeta {
   operators: Operator[];
 }
 
-const FIELD_META: Record<ConditionField, FieldMeta> = {
+/** Exported for ConditionPicker's catalog (labels) — no behavior change. */
+export const FIELD_META: Record<ConditionField, FieldMeta> = {
   subtotal: { label: "Cart subtotal", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
   weight: { label: "Cart weight", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
   quantity: { label: "Item quantity", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
@@ -95,6 +96,18 @@ function defaultValueFor(meta: FieldMeta, operator: Operator): string | number |
     return true;
   }
   return "";
+}
+
+/**
+ * Default condition for a freshly picked field — identical to what the row's
+ * own field dropdown produces on a manual switch (first operator +
+ * defaultValueFor). Shared with ConditionPicker so picker-inserted rows and
+ * field-switched rows can never diverge.
+ */
+export function makeDefaultCondition(field: ConditionField): Condition {
+  const meta = FIELD_META[field];
+  const operator = meta.operators[0];
+  return { field, operator, value: defaultValueFor(meta, operator) };
 }
 
 function convertValue(

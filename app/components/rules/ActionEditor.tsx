@@ -26,7 +26,7 @@ import Switch from "../ui/Switch";
  *     never passed through Number() — so no float rounding can creep in
  *     before the carrier callback converts to cents.
  *
- * Draft helpers are exported because RuleEditorModal serializes the drafts
+ * Draft helpers are exported because RuleForm serializes the drafts
  * into the rule-create / rule-update payloads.
  */
 

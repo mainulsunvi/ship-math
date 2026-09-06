@@ -39,6 +39,28 @@
   gap: var(--p-space-100);
 }
 
+/* Condition-picker entry rows (popover list): Polaris Button only accepts
+   string children, so entries are styled divs with full keyboard support. */
+.sm-picker-entry {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: var(--p-border-radius-100, 4px);
+  padding: var(--p-space-100) var(--p-space-200);
+  cursor: pointer;
+}
+
+.sm-picker-entry:hover,
+.sm-picker-entry:focus-visible {
+  background: var(--p-color-bg-surface-hover, rgba(0, 0, 0, 0.05));
+}
+
+.sm-picker-entry:focus-visible {
+  outline: 2px solid var(--p-color-border-focus, #4f46e5);
+  outline-offset: -2px;
+}
+
 /*
  * Nav tabs with icon+label composites: Polaris assumes `icon` means an
  * icon-ONLY tab and clamps it to a fixed width (Tab--iconOnly), which breaks

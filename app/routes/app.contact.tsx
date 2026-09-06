@@ -27,20 +27,21 @@ export default function ContactPage() {
                     label="Name"
                     name="name"
                     autoComplete="name"
-                    required
+                    requiredIndicator
                   />
                   <TextField
                     label="Email"
                     name="email"
                     type="email"
                     autoComplete="email"
-                    required
+                    requiredIndicator
                   />
                   <TextField
                     label="Message"
                     name="message"
                     multiline={4}
-                    required
+                    autoComplete="off"
+                    requiredIndicator
                   />
                   <Button submit variant="primary">
                     Send Message

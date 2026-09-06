@@ -5,6 +5,7 @@ import {
   createRule,
   deleteRule,
   duplicateRule,
+  getRuleByUid,
   listRules,
   listZones,
   setEvaluationMode,
@@ -240,6 +241,52 @@ describe("createRule / updateRule / deleteRule", function () {
     await prisma.zone.delete({ where: { id: zone.id } });
     const after = await prisma.shippingRule.findUniqueOrThrow({ where: { id: rule.id } });
     expect(after.zoneId).toBeNull();
+  });
+});
+
+describe("rule uid", function () {
+  it("createRule mints a 10-char lowercase base36 uid, distinct per rule", async function () {
+    const shopId = await createTestShop();
+    const first = await createRule(shopId, baseRuleInput({ name: "First" }));
+    const second = await createRule(shopId, baseRuleInput({ name: "Second" }));
+    expect(first.uid).toMatch(/^[0-9a-z]{10}$/);
+    expect(second.uid).toMatch(/^[0-9a-z]{10}$/);
+    expect(first.uid).not.toBe(second.uid);
+  });
+
+  it("getRuleByUid round-trips a created rule", async function () {
+    const shopId = await createTestShop();
+    const rule = await createRule(shopId, baseRuleInput({ name: "By uid" }));
+    const fetched = await getRuleByUid(shopId, rule.uid as string);
+    expect(fetched?.id).toBe(rule.id);
+    expect(fetched?.uid).toBe(rule.uid);
+    expect(fetched?.name).toBe("By uid");
+  });
+
+  it("getRuleByUid returns null for another shop's uid and for an unknown uid", async function () {
+    const shopAId = await createTestShop();
+    const shopBId = await createTestShop();
+    const ruleA = await createRule(shopAId, baseRuleInput({ name: "A only" }));
+    expect(await getRuleByUid(shopBId, ruleA.uid as string)).toBeNull(); // cross-shop never leaks
+    expect(await getRuleByUid(shopAId, "zzzzzzzzzz")).toBeNull(); // unknown uid
+  });
+
+  it("duplicateRule gives the copy its own fresh uid", async function () {
+    const shopId = await createTestShop();
+    const source = await createRule(shopId, baseRuleInput({ name: "Source", priority: 1 }));
+    const copy = await duplicateRule(shopId, source.id);
+    expect(copy.uid).toMatch(/^[0-9a-z]{10}$/);
+    expect(copy.uid).not.toBe(source.uid);
+  });
+
+  it("updateRule ignores a smuggled uid change attempt", async function () {
+    const shopId = await createTestShop();
+    const rule = await createRule(shopId, baseRuleInput({ name: "Stable" }));
+    const smuggled: RuleInput & { uid?: string } = { ...baseRuleInput({ name: "Renamed" }), uid: "smuggled01" };
+    await updateRule(shopId, rule.id, smuggled);
+    const after = await prisma.shippingRule.findUniqueOrThrow({ where: { id: rule.id } });
+    expect(after.name).toBe("Renamed"); // the real change applied
+    expect(after.uid).toBe(rule.uid); // uid untouched
   });
 });
 

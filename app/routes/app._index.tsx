@@ -57,7 +57,6 @@ import ShipMathPage from "../components/global/ShipMathPage";
 import SettingToggle from "../components/ui/SettingToggle";
 import SyncStatusCard from "../components/rules/SyncStatusCard";
 import RulesTable, { type RuleRow } from "../components/rules/RulesTable";
-import RuleEditorModal from "../components/rules/RuleEditorModal";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
 
 /** Mirrors the repository page size used by listRules (spec 005 criterion 7). */
@@ -87,6 +86,7 @@ function toRuleRow(rule: ShippingRule): RuleRow {
   const kindResult = RuleKindSchema.safeParse(rule.kind);
   return {
     id: rule.id,
+    uid: rule.uid ?? undefined,
     name: rule.name,
     kind: kindResult.success ? kindResult.data : "HIDE",
     enabled: rule.enabled,
@@ -561,8 +561,6 @@ export default function Index() {
   const modeFetcher = useFetcher<typeof action>();
   const navigate = useNavigate();
 
-  const [editorRule, setEditorRule] = useState<RuleRow | null>(null);
-  const [editorOpen, setEditorOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<RuleRow | null>(null);
 
   const busy = tableFetcher.state !== "idle" || modeFetcher.state !== "idle";
@@ -587,18 +585,11 @@ export default function Index() {
   }, [tableFetcher, loaderData.testMode]);
 
   function openNewRule() {
-    setEditorRule(null);
-    setEditorOpen(true);
+    navigate("/app/rules/new");
   }
 
   function openEditRule(rule: RuleRow) {
-    setEditorRule(rule);
-    setEditorOpen(true);
-  }
-
-  function closeEditor() {
-    setEditorOpen(false);
-    setEditorRule(null);
+    navigate(`/app/rules/${rule.uid}/edit`);
   }
 
   function confirmDelete() {
@@ -810,16 +801,6 @@ export default function Index() {
           </Card>
         </Layout.Section>
       </Layout>
-
-      {editorOpen ? (
-        <RuleEditorModal
-          key={editorRule?.id ?? "new"}
-          rule={editorRule}
-          zones={loaderData.zones}
-          suggestedPriority={(loaderData.total + 1) * 10}
-          onClose={closeEditor}
-        />
-      ) : null}
 
       {deleteTarget ? (
         <Modal

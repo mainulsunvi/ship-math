@@ -26,6 +26,8 @@ import KindChip from "./KindChip";
 
 export interface RuleRow {
   id: string;
+  /** Short public uid — route addresses for edit (/app/rules/<uid>/edit). */
+  uid?: string;
   name: string;
   kind: RuleKind;
   enabled: boolean;
