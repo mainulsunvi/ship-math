@@ -1,4 +1,4 @@
-import { Page } from "@shopify/polaris";
+import { Box, Page } from "@shopify/polaris";
 import type { PageProps } from "@shopify/polaris";
 import type { ReactNode } from "react";
 
@@ -29,7 +29,9 @@ export default function ShipMathPage({
       primaryAction={primaryAction}
       secondaryActions={secondaryActions}
     >
-      {children}
+      {/* <div style={{ paddingBottom: "40px" }}> */}
+        {children}
+      {/* </div> */}
     </Page>
   );
 }

@@ -14,6 +14,7 @@ import {
   Pagination,
   Select,
   Tooltip,
+  Link,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import type { ShippingRule } from "@prisma/client";
@@ -842,4 +843,5 @@ export default function Index() {
       ) : null}
     </ShipMathPage>
   );
+
 }

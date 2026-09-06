@@ -6,6 +6,7 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import brandStyles from "../styles/brand.css?url";
 import ShipMathNav from "../components/global/ShipMathNav";
+import ShipMathFooter from "../components/global/ShipMathFooter";
 
 import { authenticate } from "../shopify.server";
 
@@ -34,6 +35,7 @@ export default function App() {
       </NavMenu>
       <ShipMathNav />
       <Outlet />
+      <ShipMathFooter />
     </AppProvider>
   );
 }

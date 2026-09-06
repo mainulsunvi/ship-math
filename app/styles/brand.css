@@ -71,7 +71,7 @@
   padding: 0;
   border: 1px solid var(--p-color-border);
   border-radius: 999px;
-  background: var(--p-color-bg-surface-secondary);
+  background: var(--p-color-bg-surface-tertiary-hover);
   cursor: pointer;
   transition:
     background 150ms ease-in-out,
