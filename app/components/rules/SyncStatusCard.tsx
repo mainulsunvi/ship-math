@@ -74,6 +74,7 @@ export default function SyncStatusCard({
           <List.Item>Function rules enabled: {ruleCount}</List.Item>
           <List.Item>Last synced: {syncedAt ? new Date(syncedAt).toLocaleString() : "never"}</List.Item>
           <List.Item>Evaluation mode: {evaluationMode === "ALL_MATCH" ? "all matches" : "first match"}</List.Item>
+          <List.Item>Health: {budgetPct > 90 ? "Critical" : "Good"}</List.Item>
         </List>
         <Box paddingBlockStart="200">
           <Text as="p" variant="bodySm">

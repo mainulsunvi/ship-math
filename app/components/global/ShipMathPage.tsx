@@ -29,9 +29,7 @@ export default function ShipMathPage({
       primaryAction={primaryAction}
       secondaryActions={secondaryActions}
     >
-      {/* <div style={{ paddingBottom: "40px" }}> */}
-        {children}
-      {/* </div> */}
+      {children}
     </Page>
   );
 }

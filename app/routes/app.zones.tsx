@@ -392,7 +392,6 @@ export default function ZonesPage() {
       subtitle="Group destinations by country, province and postal patterns"
       primaryAction={{ content: "New zone", onAction: openNewZone, loading: busy }}
     >
-      <TitleBar title="Zones" />
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">

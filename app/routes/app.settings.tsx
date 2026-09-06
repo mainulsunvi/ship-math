@@ -5,7 +5,6 @@ import ShipMathPage from "../components/global/ShipMathPage";
 export default function SettingsPage() {
   return (
     <ShipMathPage title="Settings">
-      <TitleBar title="Settings" />
       <Layout>
         <Layout.Section>
           <Card>

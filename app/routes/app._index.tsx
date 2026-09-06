@@ -622,8 +622,15 @@ export default function Index() {
       title="Shipping rules"
       subtitle="Control how delivery options are shown and priced at checkout"
       primaryAction={{ content: "New rule", onAction: openNewRule, loading: busy }}
+      secondaryActions={[
+        {
+          content: "Sync now",
+          onAction: sync,
+          loading: busy,
+          disabled: busy,
+        },
+      ]}
     >
-      <TitleBar title="ShipMath — delivery rules" />
       <Layout>
         <Layout.Section>
           <SyncStatusCard
