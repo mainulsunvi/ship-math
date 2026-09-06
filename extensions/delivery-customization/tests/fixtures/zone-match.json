@@ -1,0 +1,48 @@
+{
+  "payload": {
+    "export": "cart-delivery-options-transform-run",
+    "target": "cart.delivery-options.transform.run",
+    "input": {
+      "cart": {
+        "cost": { "subtotalAmount": { "amount": "150.00" } },
+        "buyerIdentity": { "isAuthenticated": false, "customer": null },
+        "lines": [],
+        "deliveryGroups": [
+          {
+            "deliveryAddress": { "countryCode": "US", "provinceCode": "CA", "zip": "94105" },
+            "deliveryOptions": [
+              { "handle": "standard", "title": "Standard Shipping", "deliveryMethodType": "SHIPPING" },
+              { "handle": "pickup", "title": "Store Pickup", "deliveryMethodType": "PICK_UP" }
+            ]
+          }
+        ]
+      },
+      "deliveryCustomization": {
+        "metafield": {
+          "jsonValue": {
+            "v": 1,
+            "t": 0,
+            "m": "F",
+            "z": [{ "i": "z1", "c": ["US"], "pc": [{ "m": "P", "x": "94" }] }],
+            "r": [
+              {
+                "i": "r1",
+                "k": "H",
+                "p": 10,
+                "s": 0,
+                "z": "z1",
+                "a": { "m": "PICK_UP" }
+              }
+            ]
+          }
+        },
+        "c1": null
+      }
+    },
+    "output": {
+      "operations": [
+        { "deliveryOptionHide": { "deliveryOptionHandle": "pickup" } }
+      ]
+    }
+  }
+}

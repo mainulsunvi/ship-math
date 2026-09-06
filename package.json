@@ -15,7 +15,7 @@
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "shopify": "shopify",
     "prisma": "prisma",
-    "graphql-codegen": "../../node_modules/.bin/graphql-codegen --config package.json",
+    "graphql-code-generator": "graphql-codegen",
     "vite": "vite"
   },
   "type": "module",
@@ -34,15 +34,18 @@
     "@shopify/polaris-icons": "^9.3.1",
     "@shopify/shopify-app-remix": "^4.1.0",
     "@shopify/shopify-app-session-storage-prisma": "^8.0.0",
+    "@shopify/shopify_function": "^2.0.0",
+    "graphql-codegen": "0.4.0",
     "isbot": "^5.1.0",
+    "javy": "0.1.2",
     "prisma": "^6.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "vite-tsconfig-paths": "^5.0.1",
-    "@shopify/shopify_function": "^2.0.0",
-    "javy": "0.1.2"
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@graphql-codegen/cli": "^5.0.7",
     "@remix-run/eslint-config": "^2.16.1",
     "@remix-run/route-config": "^2.16.1",
     "@shopify/api-codegen-preset": "^1.1.1",
@@ -52,6 +55,7 @@
     "@types/react-dom": "^18.2.14",
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^10.0.1",
+    "graphql": "^16.14.2",
     "prettier": "^3.2.4",
     "typescript": "^5.2.2",
     "vite": "^6.2.2"

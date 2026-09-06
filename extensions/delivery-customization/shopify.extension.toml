@@ -1,0 +1,29 @@
+api_version = "2026-07"
+
+[[extensions]]
+name = "t:name"
+handle = "delivery-customization"
+type = "function"
+uid = "7caef09d-bc92-c4fe-9c8c-5e43dc1b38bce5a7fa55"
+description = "t:description"
+
+  [[extensions.targeting]]
+  target = "cart.delivery-options.transform.run"
+  input_query = "src/cart_delivery_run.graphql"
+  export = "cart-delivery-options-transform-run"
+
+  [extensions.build]
+  command = ""
+  path = "dist/function.wasm"
+
+  # Input-query variables: distinct product (pt) and customer (ct) tag strings
+  # referenced by rules. Values come from the JSON metafield `input-variables`
+  # on the function owner; missing keys resolve to null (variables are
+  # declared nullable on purpose — fail-open).
+  [extensions.input.variables]
+  namespace = "$app:delivery-customization"
+  key = "input-variables"
+
+  [extensions.ui.paths]
+  create = "/"
+  details = "/"

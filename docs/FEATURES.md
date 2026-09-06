@@ -4,20 +4,7 @@
 **Date:** September 2026
 **Status:** Pre-build planning
 
----
-
-
-## Special Instruction 
-- I already scafold a shopify app using cli, so you have to use that app. 
-- I need a Setup wizerd when ever some one install the app, and if an user install the app to the store for the first time, the user will find a setup wizard where all settings and iformation can be setup, also there will be an option to configure the app with AI. 
-- If the store is in basic plan then ask user for switch to Delivery Function insted of CCS / if the store has CCS Plan and user didn't enabled it, then ask to enable it.
-- I need all the function in the app to be a full function Like `function name() {}`, avoid use arrow function untill you need it. 
-- Read the ``docs/FEATURES.md`` file and generate specs using the features. Also make sure MVP Specs are priority first then other feaures. 
-- Use polaris react components. In UI / UX make sure you create compoments in ``app/components/`` and re-use it whenever you need. 
-- User `useFetcher` hook for form handling, and Form Actions. 
-- For GAPHQL create a directory /app/graphql, create queries and mutations files there as js/ts file and use when ever you need queries or mutations. Just make sure you reuse queries instead of creating it again and again. Also you can create functions for increase reusability.
-- For UI/UX and forms, use modal more then custom routes.
-- 
+--- 
 
 ## 1. Competitive Baseline
 

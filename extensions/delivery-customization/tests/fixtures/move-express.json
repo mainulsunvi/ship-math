@@ -1,0 +1,47 @@
+{
+  "payload": {
+    "export": "cart-delivery-options-transform-run",
+    "target": "cart.delivery-options.transform.run",
+    "input": {
+      "cart": {
+        "cost": { "subtotalAmount": { "amount": "75.00" } },
+        "buyerIdentity": { "isAuthenticated": false, "customer": null },
+        "lines": [],
+        "deliveryGroups": [
+          {
+            "deliveryAddress": { "countryCode": "US", "provinceCode": "CA", "zip": "94105" },
+            "deliveryOptions": [
+              { "handle": "standard", "title": "Standard Shipping", "deliveryMethodType": "SHIPPING" },
+              { "handle": "express", "title": "Express Shipping", "deliveryMethodType": "SHIPPING" },
+              { "handle": "pickup", "title": "Store Pickup", "deliveryMethodType": "PICK_UP" }
+            ]
+          }
+        ]
+      },
+      "deliveryCustomization": {
+        "metafield": {
+          "jsonValue": {
+            "v": 1,
+            "t": 0,
+            "m": "F",
+            "r": [
+              {
+                "i": "r1",
+                "k": "M",
+                "p": 10,
+                "s": 0,
+                "a": { "tc": "express", "ix": 0 }
+              }
+            ]
+          }
+        },
+        "c1": null
+      }
+    },
+    "output": {
+      "operations": [
+        { "deliveryOptionMove": { "deliveryOptionHandle": "express", "index": 0 } }
+      ]
+    }
+  }
+}

@@ -32,3 +32,101 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+// ShipMath configuration store (spec 002). Prisma is the source of truth;
+// a compact mirror is pushed to the delivery customization function owner
+// metafield (see architecture.md §A1 and app/lib/function-config.ts).
+
+model Shop {
+  id               String    @id @default(cuid())
+  shopDomain       String    @unique
+  name             String?
+  plan             String?
+  isDevShop        Boolean   @default(false)
+  testMode         Boolean   @default(true)
+  evaluationMode   String    @default("FIRST_MATCH") // FIRST_MATCH | ALL_MATCH
+  onboardedAt      DateTime?
+  functionOwnerId  String? // gid://shopify/DeliveryCustomization/… (owner of the config metafield)
+  functionSyncedAt DateTime? // null/old = mirror stale → banner + retry
+  carrierServiceId String? // gid://shopify/CarrierService/… (null = not registered; spec 007 — no syncedAt: registration is created/deleted, it cannot drift like the mirror)
+  prefs            String? // JSON: UI hint/dismissal state { dismissedHints: string[], planBannerDismissedFor?: string, checklistDismissedAt?: string } (specs 003/010)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  zones            Zone[]
+  rules            ShippingRule[]
+  requestLogs      RequestLog[]
+  auditLogs        AuditLog[]
+  aiUsage          AiUsageDay[]
+}
+
+model Zone {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  enabled     Boolean  @default(true)
+  countries   String   // JSON: string[] ISO-2, ["*"] = all
+  provinces   String   // JSON: string[] codes, ["*"] = all
+  postalRules String   // JSON: PostalRule[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rules       ShippingRule[]
+
+  @@index([shopId])
+}
+
+model ShippingRule {
+  id          String    @id @default(cuid())
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  enabled     Boolean   @default(true)
+  priority    Int // lower runs first
+  stopOnMatch Boolean   @default(false)
+  kind        String // CARRIER_RATE | HIDE | RENAME | MOVE (function rules use HIDE/RENAME/MOVE)
+  zoneId      String?
+  zone        Zone?     @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  conditions  String // JSON: ConditionGroup tree
+  action      String // JSON: typed per kind
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([shopId, priority])
+}
+
+model RequestLog {
+  id          String   @id @default(cuid())
+  shopId      String
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  source      String // CARRIER_CALLBACK | SIMULATION | FUNCTION_DEBUG
+  inputDigest String // hash of normalized cart+destination
+  input       String? // JSON: bounded input snapshot (destination, subtotal, weight, quantity, currency) — the debugging/AI substrate (specs 008/018); no customer PII beyond destination
+  matched     String // JSON: [{ ruleId, ruleName, order }]
+  rates       String? // JSON: returned rates
+  latencyMs   Int?
+  createdAt   DateTime @default(now())
+
+  @@index([shopId, createdAt])
+  @@index([shopId, source, createdAt]) // log viewer filters by source (spec 008)
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  actor     String // MERCHANT | AI | SYSTEM
+  summary   String
+  changeSet String // JSON before/after snapshot
+  createdAt DateTime @default(now())
+
+  @@index([shopId, createdAt])
+}
+
+model AiUsageDay {
+  id       String   @id @default(cuid())
+  shopId   String
+  shop     Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  day      String // YYYY-MM-DD
+  requests Int      @default(0)
+
+  @@unique([shopId, day])
+}
