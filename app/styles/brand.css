@@ -1,0 +1,109 @@
+/*
+ * ShipMath brand accent — change these tokens to rebrand the entire app.
+ * Applied only to small elements (chips, highlights) via `var(--sm-*)`;
+ * large surfaces stay Polaris-native. Indigo + rgba overlays read
+ * acceptably on dark surfaces.
+ */
+:root {
+  --sm-accent: #4f46e5;
+  --sm-accent-strong: #4338ca;
+  --sm-accent-subdued: rgba(79, 70, 229, 0.12);
+  --sm-accent-border: rgba(79, 70, 229, 0.35);
+  --sm-accent-text: #4338ca;
+}
+
+/* Dark admin themes: lighten accent text/overlays so chips clear contrast
+   on dark surfaces (review design-2026-09-06 advisory). */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sm-accent-text: #a5b4fc;
+    --sm-accent-subdued: rgba(129, 140, 248, 0.2);
+    --sm-accent-border: rgba(129, 140, 248, 0.45);
+  }
+}
+
+/*
+ * Polaris 12.27 packaging bug: build/esm/styles.css is MISSING the tab-list
+ * rule entirely (it only exists in the per-component esnext CSS under a
+ * hashed name, .Polaris-Tabs_yjc8o). The unstyled <ul> falls back to browser
+ * defaults, so tabs stack VERTICALLY with list bullets. Values below are
+ * copied verbatim from esnext/components/Tabs/Tabs.out.css, scoped to our nav.
+ */
+.sm-nav .Polaris-Tabs__Tabs {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: var(--p-space-100);
+}
+
+/*
+ * Nav tabs with icon+label composites: Polaris assumes `icon` means an
+ * icon-ONLY tab and clamps it to a fixed width (Tab--iconOnly), which breaks
+ * the label. Undo only that clamp, scoped to our nav; all other native tab
+ * styling (underline, hover, active) is untouched.
+ */
+.sm-nav .Polaris-Tabs__Tab--iconOnly {
+  width: auto;
+  padding-left: var(--p-space-400);
+  padding-right: var(--p-space-400);
+}
+
+/*
+ * Boolean toggle switch — the only toggle pattern in the app (user directive
+ * 2026-09-06: "whenever you need any kind of toggle just use the switch").
+ * Polaris 12 ships no Switch component, so .sm-switch is a native
+ * <button role="switch"> (see app/components/ui/Switch.tsx) styled purely
+ * with Polaris color tokens + the --sm-accent family, so it stays dark-mode
+ * safe. Geometry: 36px × 20px track, 14px knob with 2px margins → 16px
+ * translateX travel inside the 34px content box.
+ */
+.sm-switch {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--p-color-border);
+  border-radius: 999px;
+  background: var(--p-color-bg-surface-secondary);
+  cursor: pointer;
+  transition:
+    background 150ms ease-in-out,
+    border-color 150ms ease-in-out;
+}
+
+.sm-switch__knob {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  border-radius: 999px;
+  background: var(--p-color-icon);
+  transition: transform 150ms ease-in-out;
+}
+
+.sm-switch--on {
+  background: var(--sm-accent);
+  border-color: var(--sm-accent-strong);
+}
+
+.sm-switch--on .sm-switch__knob {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.sm-switch:focus-visible {
+  outline: 2px solid var(--p-color-border-focus);
+  outline-offset: 2px;
+}
+
+.sm-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

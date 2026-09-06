@@ -30,7 +30,7 @@ Prisma; callers load zones and pass them in.
 - `RANGE` — numeric only, inclusive (`10000-20000`); non-numeric input never matches a range rule.
 - `PARTIAL` — structured partial for UK outward codes (first half + optional district digits, e.g. `EC1A`, `EC1`) and Canadian FSA (`K7K`, `K7`); validated on save against country format.
 
-Evaluation order per destination: country must match (or `*`) → province must match (or `*`, missing province allowed only when zone lists `*`) → any postal rule matches (or none required). Zones evaluate independently; the caller decides precedence (first-match by priority in 005).
+Evaluation order per destination: country must match (or `*`) → province must match (or `*`, missing province allowed only when zone lists `*`) → any postal rule matches (or none required). Zones evaluate independently and carry no precedence of their own — rule priority in 005 is the ordering semantic (rules reference zones via a single `zoneId`; zones are a targeting filter, not an ordered chain), so zone order is deterministic input order (amended 2026-09-06: see criterion 6).
 
 ## 3. Admin GraphQL operations
 
@@ -47,7 +47,7 @@ None new.
 ## 6. File-by-file change list
 
 - `app/lib/postal.ts` — `normalizePostal(countryCode, raw)`, `validatePartialPattern(countryCode, pattern)`, `formatForDisplay(mode, rule)` declarations.
-- `app/lib/zone-matching.ts` — `matchesZone(zone, destination): boolean`, `findMatchingZones(zones, destination): Zone[]` (priority order preserved), `explainZoneMatch(zone, destination): { country: boolean, province: boolean, postalRuleId?: string }` — the explain output feeds the simulator trace (008) and AI debugging (018).
+- `app/lib/zone-matching.ts` — `matchesZone(zone, destination): boolean`, `findMatchingZones(zones: WireZone[], destination: Destination): WireZone[]` (pure filter preserving input order — no zone priority; amended 2026-09-06), `explainZoneMatch(zone, destination): { country: boolean, province: boolean, postalRuleId?: string }` — the explain output feeds the simulator trace (008) and AI debugging (018).
 - `app/lib/__tests__/zone-matching.test.ts` — the table-driven test suite (see criteria).
 - `app/components/zones/PostalRuleList.tsx` + `PostalRuleEditor.tsx` — modal editors used by 005 (validation via `validatePartialPattern`).
 
@@ -58,7 +58,15 @@ None new.
 3. US: `RANGE 10000-20000` matches `10001`, `20000`; not `20001`, not `1000`; `EXACT 90210` unaffected by input formatting `90210-1234` → matches base `90210` (ZIP+4 stripped).
 4. Country gate: a zone for `CA` never matches a US destination even with identical postal strings.
 5. Province gate: `["*"]` matches any/missing province; explicit list does not match missing province.
-6. `findMatchingZones` returns zones in priority order and is stable for equal priorities.
+6. `findMatchingZones(zones: WireZone[], destination: Destination): WireZone[]` — a pure
+   filter in `zone-matching.ts` — returns the zones matching the destination,
+   **preserving input order**: no sorting, no priority; stable for equal matches;
+   empty input → empty output. Amended 2026-09-06 (human decision via review 004-005
+   open question): zone precedence was superseded by rule priority in 005 — rules
+   reference zones and carry the ordering; zones are a targeting filter, not an ordered
+   chain, so deterministic order = input order (loaders order by `createdAt`). No
+   zone-priority column, no migration; revisit only if 008's simulator trace needs
+   explicit zone precedence.
 7. `explainZoneMatch` identifies exactly which gate failed for a non-matching zone.
 8. Full suite passes on Node 20 with zero network/Prisma imports (purity enforced by lint rule or test-import guard).
 9. 100 zones × 50 postal rules evaluate a destination in < 10ms (bench criterion in test).

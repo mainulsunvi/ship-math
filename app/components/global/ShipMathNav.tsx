@@ -1,71 +1,106 @@
-import { Card, Layout, Tabs, Page } from "@shopify/polaris";
+import { Card, Layout, Tabs, Icon, Page } from "@shopify/polaris";
+import type { TabProps } from "@shopify/polaris";
 import { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "@remix-run/react";
+import { useLocation } from "@remix-run/react";
+
+import {
+  HomeFilledIcon,
+  ChartCohortIcon,
+  PriceListFilledIcon,
+  SendIcon,
+  GlobeFilledIcon,
+  SettingsFilledIcon,
+} from "@shopify/polaris-icons";
 
 export default function ShipMathNav() {
   const location = useLocation();
-  const navigate = useNavigate();
   const [selected, setSelected] = useState(0);
 
   const tabs = [
     {
       id: "dashboard",
       accessibilityLabel: "Dashboard",
-      panelID: "dashboard-panel",
+      panelID: "dashboard",
       url: "/app",
-      content: "Dashboard",
+      content: (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+          <Icon source={HomeFilledIcon} />
+          Dashboard
+        </div>
+      ),
     },
     {
-      id: "additional",
-      accessibilityLabel: "Additional",
-      panelID: "additional-panel",
-      url: "/app/additional",
-      content: "Additional",
+      id: "zones",
+      accessibilityLabel: "Zones",
+      panelID: "zones",
+      url: "/app/zones",
+      content: (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+          <Icon source={GlobeFilledIcon} />
+          Zones
+        </div>
+      ),
     },
     {
       id: "settings",
       accessibilityLabel: "Settings",
-      panelID: "settings-panel",
+      panelID: "settings",
       url: "/app/settings",
-      content: "Settings",
+      content: (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+          <Icon source={SettingsFilledIcon} />
+          Settings
+        </div>
+      ),
+    },
+    {
+      id: "contact-us",
+      accessibilityLabel: "Contact Us",
+      panelID: "contact-us-panel",
+      url: "/app/contact",
+      content: (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+          <Icon source={SendIcon} />
+          Contact Us
+        </div>
+      ),
     },
   ];
 
-  // Update selected tab based on current route
+  // Update selected tab based on current route. Exact match first; then a
+  // prefix match for sub-routes, with the root tab ("/app") excluded so it
+  // can't shadow every /app/* path (otherwise Dashboard would always win).
+  // Unknown paths fall back to the Dashboard tab.
   useEffect(() => {
     const currentPath = location.pathname;
-    const activeTabIndex = tabs.findIndex(
-      (tab) => currentPath === tab.url || currentPath.startsWith(`${tab.url}/`),
-    );
 
-    if (activeTabIndex !== -1) {
-      setSelected(activeTabIndex);
-    } else {
-      setSelected(0);
-    }
+    const exactIndex = tabs.findIndex((tab) => currentPath === tab.url);
+    const prefixIndex =
+      exactIndex !== -1
+        ? exactIndex
+        : tabs.findIndex(
+            (tab) =>
+              tab.url !== "/app" && currentPath.startsWith(`${tab.url}/`),
+          );
+
+    setSelected(prefixIndex !== -1 ? prefixIndex : 0);
   }, [location.pathname]);
 
-  const handleTabChange = (selectedTabIndex: number) => {
+  const handleTabChange = (selectedTabIndex: number): void => {
     setSelected(selectedTabIndex);
-    navigate(tabs[selectedTabIndex].url);
   };
 
   return (
     <div className="quantible-custom-max-width">
-      <Page>
-        <Layout>
-          <Layout.Section>
-            <Card padding="0">
-              <Tabs
-                tabs={tabs}
-                selected={selected}
-                onSelect={handleTabChange}
-                fitted
-              />
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </Page>
+        {/* Polaris types `content` as string, but Tabs renders ReactNode tab
+            content fine at runtime. The cast keeps our custom (vertical) nav
+            without restructuring the tabs into the icon-only API. */}
+        <Tabs
+          tabs={tabs as unknown as TabProps[]}
+          selected={selected}
+          onSelect={handleTabChange}
+          
+        />
     </div>
   );
 }

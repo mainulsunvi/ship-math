@@ -33,13 +33,17 @@ import {
 } from "./config-schema";
 import { z } from "zod";
 import { SET_FUNCTION_METAFIELDS } from "../graphql/metafields";
+import { collectTags, MAX_TAGS_PER_LIST, type TagTruncation } from "./tag-collection";
+import { SOFT_CAP_BYTES } from "./budget";
 
 // ---------------------------------------------------------------------------
 // Constants — platform limits (see architecture.md §A1)
 // ---------------------------------------------------------------------------
 
-/** Functions receive `null` above 10,000 bytes; keep headroom. */
-export const SOFT_CAP_BYTES = 9500;
+/**
+ * Byte cap lives in app/lib/budget.ts — the single pure constant module
+ * shared with the UI (review 004/005).
+ */
 /** Chunk slot for future capacity expansion (input-query cost budget allows one). */
 export const CHUNK_KEY = "function-configuration-1";
 
@@ -151,6 +155,8 @@ export interface BuiltFunctionConfig {
   metafieldValues: Array<{ key: string; type: string; value: string }>;
   /** Input-query variables (distinct product/customer tags). */
   variables: { pt?: string[]; ct?: string[] };
+  /** Lists that hit the ≤100-tag platform cap and dropped at least one new tag. */
+  variablesTruncated: { pt: boolean; ct: boolean };
   /** Rule ids excluded from the mirror and why (surfaced in UI). */
   excluded: Array<{ ruleId: string; reason: string }>;
 }
@@ -206,6 +212,7 @@ export async function buildFunctionConfig(
   const wireRules: unknown[] = [];
   const productTags = new Set<string>();
   const customerTags = new Set<string>();
+  const tagTruncation: TagTruncation = { pt: false, ct: false };
 
   for (const rule of shop.rules) {
     if (rule.kind === "CARRIER_RATE") {
@@ -235,7 +242,9 @@ export async function buildFunctionConfig(
     }
 
     // Collect tag values referenced by this rule for the input-query variables.
-    collectTags(conditions, productTags, customerTags);
+    const collected = collectTags(conditions, productTags, customerTags);
+    tagTruncation.pt = tagTruncation.pt || collected.truncated.pt;
+    tagTruncation.ct = tagTruncation.ct || collected.truncated.ct;
 
     const kind = rule.kind === "HIDE" ? "H" : rule.kind === "RENAME" ? "R" : "M";
     const zoneRef = rule.zoneId ? zoneIdToIndex.get(rule.zoneId) : undefined;
@@ -274,9 +283,11 @@ export async function buildFunctionConfig(
     throw new ConfigTooLargeError(bytes);
   }
 
+  // The cap is enforced during collection (Set insertion order = deterministic
+  // condition-then-value order); the slice is a defensive no-op backstop.
   const variables: BuiltFunctionConfig["variables"] = {
-    ...(productTags.size > 0 ? { pt: Array.from(productTags).slice(0, 100) } : {}),
-    ...(customerTags.size > 0 ? { ct: Array.from(customerTags).slice(0, 100) } : {}),
+    ...(productTags.size > 0 ? { pt: Array.from(productTags).slice(0, MAX_TAGS_PER_LIST) } : {}),
+    ...(customerTags.size > 0 ? { ct: Array.from(customerTags).slice(0, MAX_TAGS_PER_LIST) } : {}),
   };
 
   return {
@@ -285,24 +296,9 @@ export async function buildFunctionConfig(
     chunked: false,
     metafieldValues: [{ key: CONFIG_KEY, type: "json", value: payload }],
     variables,
+    variablesTruncated: tagTruncation,
     excluded,
   };
-}
-
-function collectTags(group: ConditionGroup, productTags: Set<string>, customerTags: Set<string>): void {
-  for (const node of group.conditions) {
-    if ("combinator" in node) {
-      collectTags(node as ConditionGroup, productTags, customerTags);
-      continue;
-    }
-    const condition = node as Condition;
-    if (condition.field === "product_tag" && typeof condition.value === "string") {
-      productTags.add(condition.value);
-    }
-    if (condition.field === "customer_tag" && typeof condition.value === "string") {
-      customerTags.add(condition.value);
-    }
-  }
 }
 
 function safeJsonArray(raw: string): string[] {
@@ -329,6 +325,7 @@ export interface SyncResult {
   bytes: number;
   chunked: boolean;
   excluded: BuiltFunctionConfig["excluded"];
+  variablesTruncated: BuiltFunctionConfig["variablesTruncated"];
   syncedAt: string;
 }
 
@@ -373,5 +370,11 @@ export async function pushFunctionConfig(
     data: { functionSyncedAt: syncedAt },
   });
 
-  return { bytes: built.bytes, chunked: built.chunked, excluded: built.excluded, syncedAt: syncedAt.toISOString() };
+  return {
+    bytes: built.bytes,
+    chunked: built.chunked,
+    excluded: built.excluded,
+    variablesTruncated: built.variablesTruncated,
+    syncedAt: syncedAt.toISOString(),
+  };
 }

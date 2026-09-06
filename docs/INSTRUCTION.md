@@ -25,6 +25,7 @@
 - Use **Polaris React** components throughout the app.
 - Build reusable UI components inside `app/components/` and reuse them wherever applicable instead of duplicating markup/logic.
 - Prefer **modals** over custom routes for UI/UX flows and forms.
+- **Boolean toggles always use the Switch component** (`app/components/ui/Switch.tsx`) — never Checkbox, Polaris SettingToggle, or button-based toggles (user directive 2026-09-06).
 
 ## Forms
 - Use the **`useFetcher`** hook for form handling.

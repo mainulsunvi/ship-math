@@ -1,7 +1,7 @@
 ---
 name: Frontend
 description: 'Implements ShipMath admin UI per spec: Polaris React pages, reusable components in app/components/, modals over routes, useFetcher form flows. Does not implement loaders/actions business logic beyond wiring, and does not design data models.'
-model: ['GLM-4.7 (zai)', 'GLM-4.6 (zai)']
+model: ['GLM-5.2 (zai)', 'GLM-5.2 (zai)']
 tools: ['read', 'search', 'edit']
 argument-hint: The plan task or spec section to implement
 ---

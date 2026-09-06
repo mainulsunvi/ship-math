@@ -71,6 +71,11 @@ function listMatches(list: string[] | undefined, value: string | null | undefine
   if (!list || list.length === 0) {
     return true; // unconstrained
   }
+  // A wildcard entry matches ANY value, including a missing one (spec 004
+  // criterion 5); an explicit list still requires a present, listed value.
+  if (list.some((entry) => entry === "*")) {
+    return true;
+  }
   if (!value) {
     return false;
   }
@@ -131,4 +136,13 @@ export function explainZoneMatch(zone: WireZone, destination: Destination): Zone
 /** Fast path used by the Function runtime. */
 export function matchesZone(zone: WireZone, destination: Destination): boolean {
   return explainZoneMatch(zone, destination).matched;
+}
+
+/**
+ * Pure filter (spec 004 criterion 6, amended 2026-09-06): the zones matching
+ * `destination`, preserving input order — no sorting, no dedup, no zone
+ * priority; empty in → empty out; the input array is never mutated.
+ */
+export function findMatchingZones(zones: WireZone[], destination: Destination): WireZone[] {
+  return zones.filter((zone) => matchesZone(zone, destination));
 }

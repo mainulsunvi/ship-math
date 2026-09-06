@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { CarrierRateActionSchema } from "./carrier/action-schema";
 
 // ---------------------------------------------------------------------------
 // Stored format
@@ -84,6 +85,77 @@ export const ActionSchema = z.object({
   // CARRIER_RATE payload (spec 007) is intentionally not mirrored to the Function.
 });
 export type RuleAction = z.infer<typeof ActionSchema>;
+
+/** Condition fields the carrier lane can never support (architecture §A3 matrix). */
+const CARRIER_FORBIDDEN_FIELDS = new Set<string>(["product_tag", "customer_tag", "logged_in"]);
+
+/** Walk a stored condition tree (groups or leaf conditions), visiting each field name. */
+function collectConditionFields(node: unknown, visit: (field: string) => void): void {
+  if (!node || typeof node !== "object") {
+    return;
+  }
+  const entry = node as Record<string, unknown>;
+  if (typeof entry.field === "string") {
+    visit(entry.field);
+    return;
+  }
+  if (Array.isArray(entry.conditions)) {
+    for (const child of entry.conditions) {
+      collectConditionFields(child, visit);
+    }
+  }
+}
+
+/**
+ * Stored ShippingRule row (spec 005) — validates every repository write.
+ * `action` is discriminated per kind in the superRefine below: CARRIER_RATE
+ * rules carry a CarrierRateAction (architecture §A3); HIDE/RENAME/MOVE carry
+ * the OptionTarget-based function action above.
+ */
+export const StoredRuleSchema = z
+  .object({
+    name: z.string(),
+    kind: RuleKindSchema,
+    priority: z.number().int(),
+    stopOnMatch: z.boolean(),
+    zoneId: z.string().nullish(), // null clears the zone binding on update
+    conditions: ConditionGroupSchema,
+    action: z.union([CarrierRateActionSchema, ActionSchema]),
+  })
+  .superRefine(function refineStoredRule(rule, ctx) {
+    if (rule.kind === "CARRIER_RATE") {
+      // Lane capability matrix (§A3): the carrier payload has no product
+      // tags, no customer identity — those fields are function-lane only.
+      if (!CarrierRateActionSchema.safeParse(rule.action).success) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["action"],
+          message:
+            "CARRIER_RATE rules require a carrier rate action (architecture §A3: mode flat/free/tiered/percentage + serviceName/serviceCode)",
+        });
+      }
+      const forbidden = new Set<string>();
+      collectConditionFields(rule.conditions, function visit(field) {
+        if (CARRIER_FORBIDDEN_FIELDS.has(field)) {
+          forbidden.add(field);
+        }
+      });
+      if (forbidden.size > 0) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["conditions"],
+          message: `CARRIER_RATE rules cannot use ${Array.from(forbidden).sort().join(", ")} — the carrier payload has no tags or customer identity (§A3)`,
+        });
+      }
+    } else if (!ActionSchema.safeParse(rule.action).success) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["action"],
+        message: `${rule.kind} rules require a function action (target/title/position)`,
+      });
+    }
+  });
+export type RuleInput = z.infer<typeof StoredRuleSchema>;
 
 // ---------------------------------------------------------------------------
 // Wire format (mirror) — mirrors app/lib/rule-evaluation.ts types, plus the

@@ -23,7 +23,98 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
 
 ---
 
-## 001 — Foundation & embedded shell — ✅ (pre-existing)
+## 004/005 execution — Orchestrator run 2026-09-06
+
+- ✅ Backend agent (plan 004-005 Tasks 1+3): `app/lib/postal.ts`
+  (validatePartialPattern UK/CA, formatForDisplay), `app/lib/repositories/rules.ts`
+  (full rule/zone repo set, no mirror calls inside), `StoredRuleSchema` + §A3
+  lane-capability refine in `config-schema.ts`, `app/lib/carrier/action-schema.ts`,
+  root vitest 4.1.11 + sqlite fixture DB (`SHIPMATH_TEST_DATABASE_URL`), 4 test
+  files / 51 tests. Gate A: `tsc --noEmit` clean, `pnpm test` 51/51.
+- ✅ Frontend agent (Tasks 2+4+5): `app/routes/app.zones.tsx` + ZoneEditorModal +
+  PostalRuleEditor (PARTIAL UK/CA-only w/ server backstop), dashboard rework
+  (SyncStatusCard, RulesTable, toolbar, evaluation-mode Select, ≥400 cap banner),
+  rule editor stack (RuleEditorModal, recursive ConditionGroupEditor depth≤3,
+  ConditionRow w/ §A3 field hiding + tooltip, ActionEditor incl. CARRIER_RATE
+  form, string money), SettingToggle, audit helper (`writeAudit` fail-open),
+  `syncMirror` wrapper (mirror errors → stale banner + retry, never throw).
+- 🐞→✅ Tester verification: criteria matrices for 004/005 + 78 new unit-test
+  cases (zone-matching table, rule-evaluation ordering, purity guard, audit,
+  shop lifecycle). Found HIGH bug: wildcard `["*"]` province rejected missing
+  province → **fixed** in `zone-matching.ts` (wildcard checked before missing-
+  value guard; extension rebuilt). Found MEDIUM-HIGH silent truncation →
+  `variablesTruncated`/`excluded` now carried through `MirrorSyncReport` and
+  rendered as dismissible warning banners (`SyncReportWarnings`).
+- ✅ collectTags fix: tag-list (`in`/`not_in`) string[] values now flatten into
+  input variables (dedupe, 100/list cap, deterministic order) — previously
+  array tags silently never reached the Function. Pure helper in
+  `app/lib/tag-collection.ts`; 12 tests.
+- ✅ Reviewer verdict `.specs/reviews/004-005-review.md`: initial CHANGES
+  REQUESTED (1 REQUIRED + 3 should-fix) → **re-verified APPROVED** (2026-09-06).
+  All resolved: sync failure-path tests via vi.mock admin stub (4 cases,
+  MirrorSyncReport shape pinned), shared `app/lib/budget.ts` (SOFT_CAP_BYTES),
+  `validatePostalRuleForCountries` + `parseCodeArray` moved to
+  `app/lib/postal.ts` (component-import boundary removed), evaluation-mode
+  **Behavior** column added to RulesTable, dead re-export + one import-depth
+  fix applied by orchestrator (mechanical).
+- ✅ Gates final: `tsc --noEmit` clean · root vitest 11 files / 133 tests green ·
+  vite build clean · extension `Function built successfully` (post-fix) +
+  8/8 fixtures green.
+- ✅ Open question RESOLVED (2026-09-06, human decision "go with helper decision"):
+  spec 004 criterion 6 amended — `findMatchingZones(zones: WireZone[], destination:
+  Destination): WireZone[]` pure input-order filter in `zone-matching.ts`; NO
+  zone-priority column/migration (rule priority in 005 is the only ordering
+  semantic). Spec §2/§6 reconciled; architecture.md §A4 decision bullet added.
+  Gates: tsc 0 · root vitest 11 files / **140** tests (+7) · vite build 0 ·
+  extension rebuilt + 8/8 fixtures. Review file §"Criterion 6 resolution" —
+  verdict APPROVED, no open items. 004/005 lane COMPLETE pending human manual
+  test (script in review file §manual).
+- ⬜ Manual smoke (dev server) pending — HUMAN will run manually after coding
+  phase; script in review file §manual: wizard flows, mirror-failure retry
+  banner, ≥400 cap banner, US+PARTIAL rejection, UK wildcard regression.
+
+---
+
+## UI design upgrade — Orchestrator run 2026-09-06 (direction: branded accents, scope: everything)
+
+- ✅ Frontend Pass 1 (foundation): `app/styles/brand.css` (accent tokens
+  `--sm-accent` #4f46e5 family + dark-scheme overrides + `.sm-accent-dot`;
+  single place to rebrand), `ShipMathPage.tsx` shared page shell, ShipMathNav
+  rewritten (brand row + borderless Tabs, exact-match highlighting — fixed
+  greedy "/app" match bug, dead `quantible-custom-max-width` class removed),
+  NavMenu fixed to Dashboard/Zones/Settings, `/app/additional` now a
+  redirect-only stub (bookmark-safe, scaffold gone).
+- ✅ Frontend Pass 2 (surfaces): dashboard + zones + settings wrapped in
+  ShipMathPage with proper titles/subtitles/primary actions; new shared
+  `KindChip`/`AccentChip`/`ModalSection` components (reuse ×2 each);
+  RulesTable kind badges → KindChip; both editor modals sectioned (Basics /
+  IF / THEN and Identity / Targeting / Postal rules); postal preview as accent
+  chip; settings rewritten (scaffold copy gone, SettingsPage). ZERO logic
+  changes — all intents/fetchers/banners/pagination/validation verified intact
+  by review.
+- ✅ Review `.specs/reviews/design-2026-09-06.md`: CHANGES REQUESTED → all
+  three findings fixed (arrow→declaration in nav; dark-scheme accent tokens;
+  empty loader/action stubs removed from settings). Gates final: tsc 0 ·
+  vitest 140/140 · vite build clean. Verdict expected APPROVED on re-review.
+- Note: rebrand = edit tokens in `app/styles/brand.css` only.
+
+---
+
+## Switch rollout — Orchestrator run 2026-09-06 (user directive: every toggle = switch)
+
+- ✅ Frontend: NEW `app/components/ui/Switch.tsx` (accessible paddle switch:
+  button role="switch" + aria-checked + focus ring + keyboard via native
+  button; Polaris 12 has no Switch export — custom, styled with Polaris tokens
+  + `--sm-accent` in brand.css). `SettingToggle` wrapper reworked (Checkbox →
+  Switch; props contract unchanged → all call sites untouched). ALL 8 boolean
+  Checkbox usages converted: RulesTable + zones-table enabled columns,
+  SettingToggle interior, ActionEditor (Open-ended / Charge per item / Charge
+  per weight), ZoneEditorModal (Ship to every country / Any province).
+  Handlers byte-identical — control swap only, zero logic drift (verified by
+  review). Gates: tsc 0 · vitest 140/140 · vite build clean. Review appended
+  to design-2026-09-06.md → APPROVED for the Switch change.
+- ✅ Convention recorded in docs/INSTRUCTION.md (UI/UX section): boolean
+  toggles always use `app/components/ui/Switch.tsx`.
 
 ## 002 — Data model & config store — ✅ (this lane)
 

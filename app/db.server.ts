@@ -4,13 +4,27 @@ declare global {
   var prismaGlobal: PrismaClient;
 }
 
+/**
+ * Runtime behavior is unchanged when the env var is unset (Prisma then uses
+ * the schema url file:dev.sqlite exactly as before). Test setup sets
+ * SHIPMATH_TEST_DATABASE_URL to a throwaway fixture file so repository tests
+ * never touch the dev database.
+ */
+function createPrismaClient(): PrismaClient {
+  const testDatabaseUrl = process.env.SHIPMATH_TEST_DATABASE_URL;
+  if (testDatabaseUrl) {
+    return new PrismaClient({ datasourceUrl: testDatabaseUrl });
+  }
+  return new PrismaClient();
+}
+
 if (process.env.NODE_ENV !== "production") {
   if (!global.prismaGlobal) {
-    global.prismaGlobal = new PrismaClient();
+    global.prismaGlobal = createPrismaClient();
   }
 }
 
-const prisma = global.prismaGlobal ?? new PrismaClient();
+const prisma = global.prismaGlobal ?? createPrismaClient();
 
 export default prisma;
 

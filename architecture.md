@@ -233,6 +233,13 @@ response). Every 20th insert triggers a 30-day prune for that shop (spec 008).
   | `app/lib/zone-matching.ts`, `app/lib/rule-evaluation.ts` | `rule-explain.ts`, `carrier/*`, `function-config.ts`, `config-schema.ts` (Zod), `simulate.ts`, `ai/*`, repositories |
 
   Rationale: keep the wasm bundle minimal; tracing/explain code stays app-side.
+- **Zone order = input order (decided 2026-09-06, human decision via review 004-005
+  open question; amends spec 004 §7 criterion 6):** zones carry no priority —
+  `findMatchingZones(zones, destination)` in `zone-matching.ts` is a pure
+  input-order-preserving filter (loaders order by `createdAt`); rule priority (005)
+  is the only ordering semantic — rules reference zones, zones are a targeting
+  filter, not an ordered chain. Revisit with a column only if 008's simulator trace
+  needs explicit zone precedence.
 - **`explainRules(config, facts, destination)`** lives in `app/lib/rule-explain.ts`
   (app-side, pure): returns per-rule `{ruleId, matched, failedConditionPath?,
   zoneGate?}` by wrapping `evaluateConditionGroup` with a path collector and
