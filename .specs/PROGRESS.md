@@ -165,6 +165,88 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
   ids after they reverted.
 - Standing duty for every future run: code changed → update affected
   `docs/help/` pages in the same run.
+- ✅ Revision (2026-09-07, user feedback): full readability pass over
+  `docs/help/` — test-mode intro rewritten plainly (one switch, it is in
+  Settings), Go-live section rewritten to match the Switch UI (old button
+  labels no longer exist), README Settings row corrected (was still
+  "next release"), jargon replaced ("no operations", "event notification",
+  "master copy", "carrier callback", "shrinks your allowance"), nested-group
+  example made concrete (VIP tag instead of the confusing metro/weight one),
+  idioms removed ("where you stand", "keep it out of the red", "comes back").
+- ✅ Revision (2026-09-07, user request): NEW "How to use test mode, step by
+  step" section in test-mode.md (turn switch on → build rules → check work →
+  back to live with unpaid test-order instructions + 3 new screenshot
+  placeholders); replaced the thin "safe testing workflow" list, which also
+  referenced the not-yet-built simulator (doc accuracy bug) — the walkthrough
+  now uses honest checks (read rules back, verify priorities) until spec 008
+  ships the simulator, at which point Step 3 should be updated.
+- ✅ Revision (2026-09-07, user directive): all 7 `docs/help/` pages rewritten
+  in the future tense with a natural human voice ("Click **Zones** and a form
+  will open..."). Removed AI-sounding patterns ("The good news:", formulaic
+  bold-lead bullet lists, perfectly parallel sentences). The style rule was
+  added to the binding documentation rules in `docs/INSTRUCTION.md` (rule 6)
+  and `.github/agents/documentation.agent.md` (style rule 6) so every future
+  doc run writes the same way. Docs-only change; no gates required.
+
+---
+
+## 007 — Carrier service rate engine — Orchestrator run 2026-09-07
+
+- ✅ Backend (plan 007 Tasks 2–5): `app/lib/money.ts` (pure decimal-string
+  math: add/multiply/compare/clamp + `toCentsString` round half-up — zero
+  Number() on money), `app/lib/carrier/engine.ts` (pure `computeRates`:
+  priority sort, zone fail-closed, FIRST_MATCH/ALL_MATCH/stopOnMatch,
+  flat/free/tiered/percentage pipeline + perItem/perWeight/handlingFee/cap,
+  weight tiers in kg bands `[from, to)` last open), `app/lib/carrier/verify.ts`
+  (timing-safe HMAC-SHA256 base64 over raw body, fail-closed on empty secret),
+  `app/routes/carrierrates.tsx` (public POST callback: ALWAYS 200, `{rates:[]}`
+  fail-open on every gate; 1200ms budget guard; fire-and-forget RequestLog
+  `CARRIER_CALLBACK` + ~1-in-20 30-day prune; response rates use SUBUNIT
+  STRINGS per Shopify docs, description always present), `app/graphql/carrier.ts`
+  (CREATE/DELETE/LIST ops; shapes verified against shopify.dev examples — the
+  toolkit GraphQL validator tool was not exposed in this session, disclosed),
+  `app/services/carrier-registration.ts` (`ensureCarrierService` create+persist
+  GID with LIST self-heal, `removeCarrierService` tolerate already-deleted/dead
+  token and always clear GID, `probeCcs` create+immediate-delete →
+  ELIGIBLE/CCS_OFF/ERROR, `findCarrierService` for the settings loader).
+- ✅ Uninstall webhook: best-effort `removeCarrierService` (catches dead token).
+- ✅ Shared converter extraction: `buildWireZones` + exported
+  `toWireConditionGroup` in `function-config.ts` now serve BOTH lanes (§A4
+  no-drift rule); wire maps typed with `WireConditionField`/`WireOperator`,
+  postal wire uses `WirePostalRule`.
+- ✅ Frontend (Task 6): NEW `app/components/settings/GoLiveCard.tsx` (status
+  badge, scope-error + remotely-deleted banners, Go live / Enter-test-mode
+  buttons, test mode as app-standard Switch via SettingToggle); `app.settings.tsx`
+  rewritten (loader does LIST status check, intents toggle-test-mode (with
+  Function sync — config embeds `t`), enter-test-mode (sync + teardown),
+  go-live (gate testMode off → probe → ensure)); dashboard SyncStatusCard and
+  Environment card now test-mode STATUS only; dashboard `testMode` intent
+  removed — Settings is the single source (INSTRUCTION.md switch convention
+  honored). `getOrCreateShop` now returns `carrierServiceId`.
+- ✅ Tests: money 29 · engine 20 · route integration 11 (signed→rates, bad
+  HMAC/unknown domain/testMode/disabled-zone/malformed JSON → 200 empty,
+  Date.now-shifted latency-guard trip, 60-line cart through weight tiers,
+  RequestLog written, FIRST_MATCH vs ALL_MATCH) · purity guard +2 entries
+  (money, carrier/engine). vitest env gained stub SHOPIFY_* vars so route
+  tests may import shopify.server (test-only, mirrors SHIPMATH_TEST_DATABASE_URL
+  pattern).
+- ✅ Gates final: `tsc --noEmit` clean · root vitest 14 files / **209** tests ·
+  extension 8/8 (note: default 45s hook timeout trips on cold wasm build —
+  run `vitest run --hookTimeout 300000` in the extension) · vite build clean.
+- ✅ Docs shipped with code: test-mode.md (Settings location, new "Going live
+  with carrier rates" section), rules.md (live gate note), getting-started.md
+  (4th troubleshooting suspect), README.md index line.
+- 📊 LOC (this run, per git numstat + untracked counts): 2,055 lines added /
+  77 deleted across 19 files — production ~1,391, tests ~649, config 15.
+  New files: GoLiveCard 126, graphql/carrier 51, engine 248, verify 27,
+  money 164, carrierrates 246, carrier-registration 223, money.test 94,
+  carrier-engine.test 283, carrierrates-route.test 264.
+- ⚠️ Operator notes: scopes commit `6ae3fe5` landed BEFORE the no-commit
+  directive; nothing committed since. Dev store will prompt re-auth on next
+  `shopify app dev` (read_shipping/write_shipping scopes). Manual smoke
+  pending (human): go-live creates "ShipMath" carrier service, callback in
+  checkout, enter-test-mode teardown, uninstall cleanup.
+- Reviewer verdict pending (user will trigger; 004-005 review also still open).
 
 ## 002 — Data model & config store — ✅ (this lane)
 

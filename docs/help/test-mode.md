@@ -1,70 +1,111 @@
 # Test mode and evaluation mode
 
-ShipMath has two switches that change **how** your rules behave. They sound similar but do very different jobs:
+ShipMath has two settings that change **how** your rules behave:
 
 - **Test mode** keeps your rules away from real checkouts while you build.
-- **Evaluation mode** decides how many rules can apply to a single order.
+- **Evaluation mode** decides how many rules will apply to a single order.
 
-Both live in the **Environment** card on the Dashboard, and test mode is also shown in the Checkout Function status card.
+There is one test mode switch, and you will find it in Settings, inside the **Go live** card. The Dashboard will only show whether test mode is on or off; to change it, you will go to Settings.
 
-[Add Environment Card Screenshot]
+[Add Settings Page Screenshot]
 
 ## Test mode: practice without touching the checkout
 
-When test mode is **on**, the checkout applies **no operations**. Your customers see normal shipping options, exactly as if ShipMath were not there. Your rules are not lost; they are just waiting.
+When test mode is **on**, ShipMath will do nothing at checkout. Your customers will see normal shipping options, exactly as if ShipMath were not there. Your rules will not be lost; they will just wait.
 
 Turn test mode on when you:
 
-- Are building your first rules and are not sure they are right yet.
-- Want to try a risky change, like hiding options during a carrier outage.
-- Are copying a setup from another store and want to check it first.
+- are building your first rules and are not sure they are right yet.
+- want to try a risky change, like hiding options during a carrier outage.
+- are copying a setup from another store and want to check it first.
 
-The button label changes with the state, so you always know where you stand:
+The **Go live** card will always show the current state:
 
-- **Turn on test mode** is shown while you are live.
-- **Go live** is shown while you are testing.
+- The **Test mode** switch will show whether test mode is on or off, and you will click it to change it.
+- The badge at the top of the card will tell you more: **Test mode**, **Not live yet**, or **Live (carrier rates on)**.
 
-> **Remember to switch back.** While test mode is on, your rules do nothing at checkout. If your store looks "fine but unchanged" after a big setup session, check this switch first.
+> **Remember to switch back.** While test mode is on, your rules will do nothing at checkout. If your store looks "fine but unchanged" after a big setup session, check this switch first.
+
+## How to use test mode, step by step
+
+### Step 1: Turn test mode on
+
+1. Click **Settings** in the app menu at the top.
+2. Find the **Go live** card.
+3. Click the **Test mode** switch, and it will turn on.
+4. The badge at the top of the card will change to **Test mode**.
+
+[Add Test Mode Switch On Screenshot]
+
+### Step 2: Build or change your rules
+
+Work on the Dashboard as usual. You can create zones, create rules, edit or delete anything you like. Every change will be saved and sent to the checkout the same way as always. The difference: while test mode is on, the checkout will hold your rules but will not use them. Nothing you do will affect what your customers see.
+
+### Step 3: Check your work
+
+While test mode is on, the checkout cannot show you your rules, so use these checks instead:
+
+- Open each rule on the Dashboard and read it back as a sentence: when this happens, do that. If the sentence does not match what you want, edit the rule.
+- In the rules table, confirm the right rules are switched on and the priority numbers run in the order you expect. Lower numbers will run first.
+- If you use carrier rate rules, check the prices and tiers in each rule's THEN section. They will only show at checkout after you go live.
+
+### Step 4: Go back to live
+
+1. Return to **Settings** and click the **Test mode** switch so it turns off.
+2. If you use carrier rate rules, press **Go live** in the same card.
+3. Place a test order: start a checkout as a customer would, look at the delivery options, then close the page before paying.
+4. If something looks wrong, switch test mode back on, fix the rule, and try again. You can repeat this as many times as you like.
+
+[Add Live Checkout Test Screenshot]
+
+## Going live with carrier rates
+
+Carrier rate rules work a little differently from the other kinds: during checkout, Shopify will ask ShipMath directly for a price. For your prices to show up, you need two things:
+
+1. **Test mode is off.**
+2. You pressed **Go live** in Settings, so ShipMath is registered with your store's checkout.
+
+While you are live, the card will show the badge **Live (carrier rates on)**, and customers will see the prices from your carrier rate rules.
+
+You can stop serving rates in two ways:
+
+- **Switch test mode on**, and ShipMath will stay connected but serve no rates. Switch it off again, and your rates will come back.
+- Press **Enter test mode**, and ShipMath will remove itself from your checkout completely. To serve rates again, switch test mode off and press **Go live**.
+
+Carrier rate rules will not need a sync, because Shopify reads your rates live. Hide, rename, and move rules will still sync to the checkout as described in [Syncing your changes](sync.md).
+
+[Add Go Live Card Screenshot]
 
 [Add Test Mode On Screenshot]
 
 ## Evaluation mode: one rule or many?
 
-The **Evaluation mode** dropdown has two options, and picking the right one makes your rules behave the way you expect.
+The **Evaluation mode** dropdown has two options, and picking the right one will make your rules behave the way you expect.
 
 ### First match wins
 
-Only one rule applies per order: the matching rule with the lowest priority number. Everything else is ignored for that order.
+Only one rule will apply per order: the matching rule with the lowest priority number. Everything else will be ignored for that order.
 
-**Example**: you have one rate rule per region, like "UK rate", "EU rate", "US rate". An order matches only one region, and exactly one rule should apply. This is the mode for that.
+**Example**: you have one rate rule per region, like "UK rate", "EU rate", "US rate". An order will match only one region, and exactly one rule will apply. This is the mode for that.
 
 ### All matches apply
 
-Every matching rule applies, in priority order. This lets rules do different jobs on the same order: one rule renames an option while another sets a special price.
+Every matching rule will apply, in priority order. This lets rules do different jobs on the same order: one rule will rename an option while another sets a special price.
 
-**Example**: rule 1 renames your standard option to "EasyPak Standard", and rule 2 gives free shipping over 50. A big order can match both, and that is exactly what you want.
+**Example**: rule 1 renames your standard option to "EasyPak Standard", and rule 2 gives free shipping over 50. A big order will match both, and that is exactly what you want.
 
 ### Stop on match
 
-In "all matches" mode, each rule has a **Stop on match** switch. When a rule with it enabled fires, the rules below it are skipped. Use it for a "premium handling" rule that should win over everything below it, no matter what.
+In "all matches" mode, each rule has a **Stop on match** switch. When a rule with this switch turned on fires, the rules below it will be skipped. Use it for a "premium handling" rule that will always win over the rules below it.
 
 [Add Evaluation Mode Dropdown Screenshot]
 
 ## Priority, one more time
 
-In both modes, priority decides the order in which rules are considered. Lower numbers run first: priority 1 runs before priority 5. Use the priority arrows in the rules table to reorder without opening each rule.
-
-## A safe testing workflow
-
-1. Turn on **test mode**.
-2. Build your zones and rules.
-3. Preview them in the simulator.
-4. Fix anything that looks wrong.
-5. Press **Go live** to switch test mode off.
-6. Sync, then place a test order at checkout to confirm.
+In both modes, priority decides the order in which rules will be considered. Lower numbers will run first: priority 1 will run before priority 5. You can use the priority arrows in the rules table to reorder without opening each rule.
 
 ## Video tutorial
 
 [Add Test Mode Video Tutorial]
 
-A video covering both modes, with a full safe-testing workflow, is on the way. It will appear right here when it is ready.
+A video covering both modes, with a full test mode walkthrough, is on the way. It will appear right here when it is ready.

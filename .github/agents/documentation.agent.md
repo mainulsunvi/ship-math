@@ -46,7 +46,12 @@ Every help document must follow all eight:
 4. Use how-to / doc-blog style: short intro, headed steps, what-to-read-next.
 5. Documentation is part of done — any task that changes code updates the
    affected docs in the same run.
-6. Check grammar; use easy-to-read English words.
+6. Check grammar; use easy-to-read English words. Describe outcomes in the
+   **future tense**: when the reader clicks, saves, or switches something, say
+   what will happen next ("A form will open, and you will be able to pick your
+   countries"). Write like a person helping a colleague, not like a brochure or
+   a bot: vary sentence length, prefer flowing sentences over bold-lead bullet
+   lists, and avoid filler like "The good news:".
 7. do not use the word "we" — the docs are for the merchant, not the developer.
 8. do not use "em-dash" to the content.
 

@@ -70,7 +70,7 @@ mutation collectionCreate($input: CollectionInput!) {
   3. Every document has a **Video tutorial** section with a visible placeholder, like `[Add Getting Started Video Tutorial]`.
   4. Prefer how-to / doc-blog style: short intro, headed steps, what-to-read-next.
   5. **Docs ship with code** — finishing a task or changing app behavior includes updating the affected `docs/help/` pages in the same run.
-  6. Always check grammar and use easy-to-read English words.
+  6. Always check grammar and use easy-to-read English words. Describe outcomes in the **future tense**: after the reader acts, say what will happen next ("Click **Save**. A green banner will confirm the change."). Write naturally, the way one person explains things to another; avoid formulaic patterns that read as AI-generated (endless bold-lead bullet lists, filler like "The good news:", perfectly parallel sentences).
   7. Never use the word "we" (or "us"/"our") in help content — the docs are for the merchant, not the developer.
   8. Never use em-dashes in help content.
 
