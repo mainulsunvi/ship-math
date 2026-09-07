@@ -23,7 +23,8 @@ api_version = "2026-10"
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 # read/write_delivery_customizations: create the function owner + set its config metafield (architecture.md §A1)
-scopes = "read_products, read_delivery_customizations, write_delivery_customizations"
+# read/write_shipping: carrier service registration + callback (spec 007, architecture.md §A3) — added in ONE batch per plan 000
+scopes = "read_products, read_delivery_customizations, write_delivery_customizations, read_shipping, write_shipping"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
