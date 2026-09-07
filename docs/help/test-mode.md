@@ -43,11 +43,16 @@ Work on the Dashboard as usual. You can create zones, create rules, edit or dele
 
 ### Step 3: Check your work
 
-While test mode is on, the checkout cannot show you your rules, so use these checks instead:
+While test mode is on, the checkout cannot show you your rules, so use the [rate simulator](simulator.md) instead:
 
+- Open **Simulator** in the app menu. Pick real products or type cart lines, fill in a checkout-style destination, and click **Run simulation**. ShipMath will run your rules exactly as checkout will, and the results will show the rates and the changes your rules would produce.
+- Read the rule-by-rule trace in the results: a green badge means the rule matched, a gray one means it did not, and ShipMath will tell you why. This is the fastest way to spot a condition that says the opposite of what you meant.
 - Open each rule on the Dashboard and read it back as a sentence: when this happens, do that. If the sentence does not match what you want, edit the rule.
 - In the rules table, confirm the right rules are switched on and the priority numbers run in the order you expect. Lower numbers will run first.
-- If you use carrier rate rules, check the prices and tiers in each rule's THEN section. They will only show at checkout after you go live.
+
+The simulator works exactly the same with test mode on or off. Every run will be saved on the [Request log](logs.md) page, so you can compare runs after you change a rule.
+
+[Add Rate Simulator Screenshot]
 
 ### Step 4: Go back to live
 

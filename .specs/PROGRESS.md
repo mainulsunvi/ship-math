@@ -286,14 +286,176 @@ UI editor designed — `plans/004-005-plan.md`)
 
 ## 005 — Rule builder UX — 📐 plan ready (seed action + status page shipped)
 
-## 007 — Carrier service engine — 📐 plan ready (action schema lands with 004/005 Task 5)
+## 007 — Carrier service engine — ✅ (run 2026-09-07, see section above)
 
-## 008 — Test-mode simulator & log — 📐 plan ready (testMode flag wired through mirror +
-Function; simulator UI pending)
+## 008 — Test-mode simulator & log — ✅ (Orchestrator run 2026-09-07, detail below)
 
 ## 009 — AI assistant — 📐 plan ready (needs env keys before coding)
 
 ## 010 — Review kit — 📐 plan ready (needs hosting URL before final docs)
+
+---
+
+## 008 execution — Test mode, rate simulator & request log — 2026-09-07
+
+- ✅ `app/lib/rule-explain.ts` — pure explain traces: `explainConditionFailure`
+  (exact leaf path, e.g. `c.n[1].n[0]`, through the SHARED evaluator — no
+  re-implementation), `explainRules` (every rule reported, zone gates incl.
+  fail-closed `missing-zone`), `traceCarrierRules` one-call wrapper.
+- ✅ `app/lib/carrier/engine.ts` — `computeRatesDetailed` IS the production
+  loop (`computeRates` is now a thin `.rates` projection — parity by
+  construction); tier-no-match continues the pipeline (`producedRate: false`,
+  never short-circuits); `toCartFacts` exported.
+- ✅ `app/lib/simulate.ts` — `simulateRun(shopDomain, input)`: Function lane via
+  `buildFunctionConfig` + `explainRules` (ConfigTooLargeError → `note` +
+  `wireBytes`, carrier lane still runs), Carrier lane identical to the
+  callback route; zod `SimInputSchema`; writes one SIMULATION RequestLog row
+  (matched tagged `lane: FUNCTION|CARRIER`) + `parseSimPayload` shared by both
+  routes that host the modal.
+- ✅ `app/lib/function-config.ts` — `BuiltFunctionConfig.mirrored`
+  (wireId → Prisma ruleId) so simulator traces carry real rule names with no
+  order-duplication drift.
+- ✅ `app/lib/prune-logs.ts` — `pruneIfDue` (1-in-20), `pruneRequestLogs`
+  (30-day, per-shop), `inputDigestFor`; carrierrates route now uses the
+  shared helpers (behavior unchanged).
+- ✅ Simulator UI — `app/components/simulator/` (CartBuilder, DestinationForm,
+  TraceResult, SimulatorModal); `app._index` button ENABLED + `simulate`
+  intent; `app.logs.tsx` (50/page, ?source filter, expandable rows, same
+  modal); nav **Logs** tab (ChartCohortIcon).
+- ✅ Tests +18 (231 total root): rule-explain 10, simulate 7 (byte-identical
+  parity vs `computeRates`, ALL_MATCH winner traces, zone gate naming,
+  over-budget degradation, SIMULATION row shape, test-mode independence),
+  prune 4 (idempotent sweep, deterministic cadence, digest stability),
+  purity-guard entry for `rule-explain.ts`.
+- ✅ Docs (future tense, same run): NEW `docs/help/logs.md`; test-mode.md
+  Step 3 leads with the simulator; rules.md "Preview with the simulator";
+  help README table rows (Rules, Logs) + guide link.
+- ✅ Gates: `tsc --noEmit` 0 · root vitest 17 files / **231** tests green ·
+  extension 8/8 fixtures green (hookTimeout 300s) · `pnpm run build` clean.
+- LOC: ~2,550 added (12 new files ≈2,334 incl. help page + 9 modified, +212/−52).
+- ⬜ Manual smoke pending — HUMAN: run simulator from dashboard + logs page,
+  confirm SIMULATION rows appear in Logs, filter works, prune does not eat
+  fresh rows.
+
+### 008 addendum — simulator page (2026-09-08)
+
+- ✅ Simulator promoted from modal to full route `app/routes/app.simulator.tsx`;
+  Dashboard "Simulate rates" + Logs page now deep-link to it; simulator nav tab
+  (PriceListFilledIcon) + NavMenu link added.
+- ✅ Pickers: products via `shopify.resourcePicker` (App Bridge v4 API — the old
+  `ResourcePicker` component is gone from `@shopify/app-bridge-react`) with real
+  prices/weights/SKUs + editable rows (custom lines still available); full
+  checkout-style `AddressForm` (26 countries, US/CA province selects); pickup
+  locations + customers (3 dummy testers + real customers w/ tags) via new
+  `app/graphql/directory.ts` (scopes `read_customers`, `read_locations` added);
+  Shopify shipping zones via direct REST `shipping_zones.json` fetch (session
+  token; `admin.rest` does not exist in this AdminApiContext) used as a
+  destination-country shortcut.
+- ✅ Combined-rules picker: `onlyRuleIds` in `SimInputSchema` — Function lane
+  filters `built.mirrored` → wire ids before `r` filtering; carrier lane
+  `where id in`; empty/absent = all rules (test "onlyRuleIds scopes the run").
+- ✅ `CheckoutSummary` (checkout-style order summary: ship-to, line items with
+  images, items/weight/subtotal, shipping-rate radios, shipping + total) +
+  TraceResult in a sticky right column.
+- ✅ Dead code removed: SimulatorModal, CartBuilder, DestinationForm deleted;
+  TraceResult kept.
+- ✅ Docs: NEW `docs/help/simulator.md` (full page guide); rules.md simulator
+  section + test-mode.md Step 3 + help README (guide link + Simulator table row)
+  point at the page.
+- ✅ Gates: `tsc --noEmit` 0 · root vitest **232** green (+1 onlyRuleIds) ·
+  extension 8/8 · `pnpm run build` clean.
+- LOC: ~1,600 added (5 new files 1,594: app.simulator.tsx 937, AddressForm 255,
+  CheckoutSummary 265, directory.ts 38, simulator.md 99; index/logs strip-down
+  offsets part of it in modified files).
+
+### 008 addendum 2 — store shipping methods in the summary (2026-09-08)
+
+- ✅ Shopify's own rates (price/weight-based, e.g. Standard free / Express $15)
+  now appear in the summary's rates box: `app/lib/store-rates.ts` parses REST
+  `shipping_zones.json` (shared fetch with the zone picker), filters by
+  destination/subtotal/weight (bounds inclusive, province-restricted zones
+  honored), applies Function-lane HIDE/RENAME/MOVE via the SHARED
+  `optionMatchesTarget` (parity by construction), then appends carrier rates
+  and applies MOVEs over the combined list (clamped like the Function).
+- ✅ Page: loader returns `storeRates`; address defaults to the first store
+  zone's country; CheckoutSummary renders `CheckoutOption[]` with store/rule
+  source labels and stale-selection fallback; fixed `&&`-vs-`||` id-guard bug
+  in the zone-option builder.
+- ✅ Tests +15 (**247** total root): parsing (malformed skipped), country/
+  province/subtotal/weight filtering, HIDE (targeted, catch-all, methodType
+  PICK_UP ignored), RENAME, MOVE (combined list, clamped, priority order).
+- ✅ Docs: simulator.md order-summary section documents store methods, zone
+  gating, and the Markets caveat. Gates: tsc 0 · 247 green · build clean.
+
+### 008 addendum 3 — store rates via GraphQL + customization report (2026-09-08)
+
+- ✅ Root cause of "No shipping options": the REST fetch pinned
+  `/admin/api/2026-10/` (not a real version) → 404 → zones AND store rates
+  silently empty. Replaced with `DELIVERY_PROFILES_QUERY` in directory.ts
+  via `admin.graphql` (app-pinned version; no manual version string).
+  Schema-validated against 2025-10 (the effective runtime version — the
+  app's January25 pin auto-upgrades): `code` is an OBJECT {countryCode,
+  restOfWorld} there (union only in 2026+), and methodDefinitions hang off
+  locationGroupZones, NOT the zone.
+- ✅ store-rates.ts rewritten for the GraphQL shape: methodDefinitions with
+  rateProvider DeliveryRateDefinition static prices (carrier participants
+  skipped), methodConditions TOTAL_PRICE/TOTAL_WEIGHT (MoneyV2/Weight
+  criteria; units converted to grams), provinces on DeliveryCountry,
+  rest-of-world zones cover any country, method ids de-duplicated across
+  profiles. Bonus: Markets-based shipping IS covered (delivery profiles).
+- ✅ buildCheckoutOptions → CheckoutPreview {options, customizations,
+  unmatchedOps}: ONE combined store+carrier list, ops applied in priority
+  order through the shared optionMatchesTarget; every hide/rename/move
+  recorded (old+new title, final position).
+- ✅ UI: "Delivery customizations" list under the rates box in the summary
+  ("\"Express\" hidden by rule \"No express\"", …, moved → 1-based position);
+  subdued note when ops ran but matched nothing (unmatchedOps).
+- ✅ Tests +4 net (**251** total root, 19 in store-rates): GraphQL fixtures,
+  ROW/province zones, pounds/kilograms bounds, ops-across-both-sources
+  (rename reaches carrier rates), priority order, unmatched counting.
+- ✅ Gates: tsc 0 · 251 green · build clean. Extension untouched.
+
+### 008 addendum 4 — "still no shipping methods" diagnostics (2026-09-08)
+
+- ✅ Root causes addressed: (1) app pinned `ApiVersion.January25` ("2025-01",
+  EXPIRED Jan 2026) — every admin.graphql call was at Shopify's mercy for
+  unsupported versions; bumped to `ApiVersion.January26` (installed
+  shopify-api 13.1.0 enum max; DELIVERY_PROFILES_QUERY re-validated against
+  2026-01 — same `code {countryCode restOfWorld}` object shape as 2025-10).
+  (2) New scopes (`read_shipping` etc., added to toml earlier this session)
+  only take effect after the store RE-AUTHORIZES — stale token = silent
+  empty lists.
+- ✅ No more silent failure: fetchDeliveryZones returns `error` (HTTP status,
+  GraphQL error messages, or exception) → loader `storeRatesError` → warning
+  Banner on the simulator page with the actual message + reinstall/dev
+  guidance. Rule-based rates unaffected either way.
+- ✅ Gates: tsc 0 · 251 green · build clean.
+- ⬜ HUMAN: rerun `shopify app dev` (accept the scope update prompt), reload
+  Simulator — Standard/Express should list as "store"; if not, the banner
+  now names the exact reason.
+
+### 008 addendum 5 — query-cost pagination (2026-09-08)
+
+- ✅ The banner surfaced the real blocker: the single deliveryProfiles query
+  cost **1527 points** (Shopify single-query limit: 1000) — nested firsts
+  20/50/100 multiply. Fixed: DELIVERY_PROFILES_QUERY now takes `$after` and
+  pages **2 profiles per request** with capped inner lists (20 zones, 20
+  methods), re-validated against 2026-01; fetchDeliveryZones loops pageInfo
+  (≤ 8 pages → 16 profiles) and keeps the error surfacing. Per-request cost
+  is far under the limit; total coverage unchanged for realistic stores.
+- ✅ Gates: tsc 0 · 251 green · build clean.
+
+### 008 addendum 6 — sticky order summary fix (2026-09-08)
+
+- ✅ Root cause: Polaris 12.27 Layout renders `align-items: flex-start` —
+  each `Layout.Section` collapses to its OWN content height, so the sticky
+  right column had zero travel room inside its parent and position:sticky
+  silently did nothing. Replaced the page's Layout with a custom flex row
+  (`align-items: stretch`, wrap, gap 1rem, bases 30rem/24rem) — columns now
+  stretch to row height and the sticky summary engages. Verified body and
+  .Polaris-Page set no overflow (no scroll-container culprit); Polaris
+  itself uses position:sticky 13× in its bundle.
+- ✅ Gates: tsc 0 · build clean (UI-only change; 251 tests untouched).
 
 ---
 

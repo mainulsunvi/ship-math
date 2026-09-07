@@ -41,7 +41,7 @@ import {
   type WireConditionGroup,
   type WireZone,
 } from "../rule-evaluation";
-import { matchesZone, type Destination } from "../zone-matching";
+import { explainZoneMatch, type Destination } from "../zone-matching";
 
 /** 1 gram in pounds (decimal factor; lb pricing is inherently approximate). */
 const LB_PER_GRAM = "0.0022046226";
@@ -197,7 +197,7 @@ function computeRateForAction(action: CarrierRateAction, cart: CarrierCartContex
 }
 
 /** CartFacts for the shared condition evaluator. Carrier lane: no tags, no login. */
-function toCartFacts(cart: CarrierCartContext): CartFacts {
+export function toCartFacts(cart: CarrierCartContext): CartFacts {
   return {
     subtotal: Number(cart.subtotal),
     quantity: cart.quantity,
@@ -211,17 +211,39 @@ function toCartFacts(cart: CarrierCartContext): CartFacts {
 }
 
 /**
- * Evaluate CARRIER_RATE rules against the cart. Rules run in priority order
- * (lower first); FIRST_MATCH stops after the first producing rule; ALL_MATCH
- * applies every matching rule unless one has stopOnMatch. A rule whose tier
- * bands don't cover the cart produces no rate and the pipeline continues.
+ * Per-rule outcome of the carrier pipeline (spec 008 traces). `matched` is
+ * conditions AND zone; `zoneGate` names the gate that failed (or that the
+ * zone row is missing/disabled — fail-closed); `producedRate` is false when
+ * the rule matched but no tier band covered the cart.
  */
-export function computeRates(
+export interface CarrierRuleOutcome {
+  ruleId: string;
+  matched: boolean;
+  zoneGate?: "country" | "province" | "postal" | "missing-zone";
+  producedRate: boolean;
+}
+
+export interface DetailedCarrierResult {
+  rates: ComputedRate[];
+  outcomes: CarrierRuleOutcome[];
+}
+
+/**
+ * Evaluate CARRIER_RATE rules against the cart WITH per-rule traces.
+ *
+ * This is THE production loop — computeRates() below is a thin projection of
+ * it, so the simulator (008) and the live callback (007) cannot drift
+ * (§A4). Rules run in priority order (lower first); FIRST_MATCH stops after
+ * the first producing rule; ALL_MATCH applies every matching rule unless one
+ * has stopOnMatch. A rule whose tier bands don't cover the cart produces no
+ * rate and the pipeline continues (it never short-circuits the modes).
+ */
+export function computeRatesDetailed(
   rules: CarrierRule[],
   zones: WireZone[],
   cart: CarrierCartContext,
   evaluationMode: EvaluationMode = "FIRST_MATCH",
-): ComputedRate[] {
+): DetailedCarrierResult {
   const ordered = rules.slice().sort(function byPriority(a, b) {
     return a.priority - b.priority;
   });
@@ -237,31 +259,79 @@ export function computeRates(
   };
 
   const rates: ComputedRate[] = [];
+  const outcomes: CarrierRuleOutcome[] = [];
   for (const rule of ordered) {
     let matched = evaluateConditionGroup(rule.conditions ?? undefined, facts);
+    let zoneGate: CarrierRuleOutcome["zoneGate"];
     if (matched && rule.zoneId !== null) {
       const zone = zoneMap.get(rule.zoneId);
-      matched = zone ? matchesZone(zone, destination) : false; // missing zone = no match (fail-closed)
+      if (!zone) {
+        matched = false;
+        zoneGate = "missing-zone"; // missing/disabled zone = no match (fail-closed)
+      } else {
+        // Same walk matchesZone performs — the explanation is derived from
+        // the identical boolean, so traces can never disagree with rates.
+        const explanation = explainZoneMatch(zone, destination);
+        matched = explanation.matched;
+        if (!explanation.matched) {
+          zoneGate = !explanation.countryMatched
+            ? "country"
+            : !explanation.provinceMatched
+              ? "province"
+              : "postal";
+        }
+      }
     }
-    if (!matched) {
-      continue;
+    let producedRate = false;
+    if (matched) {
+      const priceCents = computeRateForAction(rule.action, cart);
+      if (priceCents !== null) {
+        producedRate = true;
+        rates.push({
+          serviceName: rule.action.serviceName,
+          serviceCode: rule.action.serviceCode,
+          priceCents,
+          ...(rule.action.description !== undefined ? { description: rule.action.description } : {}),
+        });
+        outcomes.push({
+          ruleId: rule.id,
+          matched: true,
+          ...(zoneGate !== undefined ? { zoneGate } : {}),
+          producedRate,
+        });
+        if (rule.stopOnMatch) {
+          break;
+        }
+        if (evaluationMode === "FIRST_MATCH" && rates.length >= 1) {
+          break;
+        }
+        continue;
+      }
+      // no band covered the cart → the rule matched but produces no rate and
+      // the pipeline continues (never short-circuits)
     }
-    const priceCents = computeRateForAction(rule.action, cart);
-    if (priceCents === null) {
-      continue; // no band covered the cart → rule fails, pipeline continues
-    }
-    rates.push({
-      serviceName: rule.action.serviceName,
-      serviceCode: rule.action.serviceCode,
-      priceCents,
-      ...(rule.action.description !== undefined ? { description: rule.action.description } : {}),
+    outcomes.push({
+      ruleId: rule.id,
+      matched,
+      ...(zoneGate !== undefined ? { zoneGate } : {}),
+      producedRate,
     });
-    if (rule.stopOnMatch) {
-      break;
-    }
-    if (evaluationMode === "FIRST_MATCH" && rates.length >= 1) {
-      break;
-    }
   }
-  return rates;
+  return { rates, outcomes };
+}
+
+/**
+ * Evaluate CARRIER_RATE rules against the cart (live callback path). Rules
+ * run in priority order (lower first); FIRST_MATCH stops after the first
+ * producing rule; ALL_MATCH applies every matching rule unless one has
+ * stopOnMatch. A rule whose tier bands don't cover the cart produces no rate
+ * and the pipeline continues.
+ */
+export function computeRates(
+  rules: CarrierRule[],
+  zones: WireZone[],
+  cart: CarrierCartContext,
+  evaluationMode: EvaluationMode = "FIRST_MATCH",
+): ComputedRate[] {
+  return computeRatesDetailed(rules, zones, cart, evaluationMode).rates;
 }

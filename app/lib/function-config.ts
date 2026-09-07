@@ -213,6 +213,8 @@ export interface BuiltFunctionConfig {
   variablesTruncated: { pt: boolean; ct: boolean };
   /** Rule ids excluded from the mirror and why (surfaced in UI). */
   excluded: Array<{ ruleId: string; reason: string }>;
+  /** Wire id → Prisma id for every mirrored rule (simulator trace naming, 008). */
+  mirrored: Array<{ wireId: string; ruleId: string }>;
 }
 
 export async function buildFunctionConfig(
@@ -227,6 +229,7 @@ export async function buildFunctionConfig(
   });
 
   const excluded: BuiltFunctionConfig["excluded"] = [];
+  const mirrored: BuiltFunctionConfig["mirrored"] = [];
   const referencedZoneIds = new Set(
     shop.rules.map((rule) => rule.zoneId).filter((id): id is string => Boolean(id)),
   );
@@ -271,9 +274,10 @@ export async function buildFunctionConfig(
 
     const kind = rule.kind === "HIDE" ? "H" : rule.kind === "RENAME" ? "R" : "M";
     const zoneRef = rule.zoneId ? zoneIdToIndex.get(rule.zoneId) : undefined;
+    const wireId = `r${wireRules.length + 1}`;
 
     wireRules.push({
-      i: `r${wireRules.length + 1}`,
+      i: wireId,
       k: kind,
       p: rule.priority,
       s: rule.stopOnMatch ? 1 : 0,
@@ -286,6 +290,7 @@ export async function buildFunctionConfig(
         ...(rule.kind === "MOVE" && typeof action.position === "number" ? { ix: action.position } : {}),
       },
     });
+    mirrored.push({ wireId, ruleId: rule.id });
   }
 
   const config = {
@@ -321,6 +326,7 @@ export async function buildFunctionConfig(
     variables,
     variablesTruncated: tagTruncation,
     excluded,
+    mirrored,
   };
 }
 

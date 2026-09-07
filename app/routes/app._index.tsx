@@ -13,7 +13,6 @@ import {
   Modal,
   Pagination,
   Select,
-  Tooltip,
   Link,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -686,11 +685,13 @@ export default function Index() {
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
                   <InlineStack gap="300">
-                    <Tooltip content="Rate simulator arrives with the simulator spec — not wired up yet.">
-                      <span>
-                        <Button disabled>Simulate rates</Button>
-                      </span>
-                    </Tooltip>
+                    <Button
+                      onClick={function openSimulator() {
+                        navigate("/app/simulator");
+                      }}
+                    >
+                      Simulate rates
+                    </Button>
                   </InlineStack>
                   <Text as="span" variant="bodySm" tone="subdued">
                     {loaderData.total} rule(s) · page {loaderData.page} of {loaderData.totalPages}
@@ -802,5 +803,4 @@ export default function Index() {
       ) : null}
     </ShipMathPage>
   );
-
 }

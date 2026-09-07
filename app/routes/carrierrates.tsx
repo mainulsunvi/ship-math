@@ -26,6 +26,7 @@ import { computeRates, type CarrierRule, type CarrierCartContext } from "../lib/
 import { CARRIER_HMAC_HEADER, verifyCarrierCallback } from "../lib/carrier/verify";
 import { parseStoredJson } from "../lib/config-schema";
 import { buildWireZones, toWireConditionGroup } from "../lib/function-config";
+import { inputDigestFor, pruneIfDue, pruneRequestLogs } from "../lib/prune-logs";
 
 /** Cents (integer) → decimal string: 1250 → "12.50", 5 → "0.05". Integer math only. */
 function centsToDecimalString(cents: number): string {
@@ -248,19 +249,7 @@ async function logCallback(
       latencyMs,
     },
   });
-  if (Math.random() < 0.05) {
-    await pruneOldLogs(shopId);
+  if (pruneIfDue()) {
+    await pruneRequestLogs(shopId);
   }
-}
-
-function inputDigestFor(input: unknown): string {
-  // Stable digest of the normalized input (no crypto need — dedup/debug key).
-  return Buffer.from(JSON.stringify(input), "utf8").toString("base64url").slice(0, 32);
-}
-
-async function pruneOldLogs(shopId: string): Promise<void> {
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  await prisma.requestLog.deleteMany({
-    where: { shopId, createdAt: { lt: cutoff } },
-  });
 }

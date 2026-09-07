@@ -36,6 +36,12 @@ const PURE_MODULES: Array<{ file: string; allowed: readonly string[] }> = [
     file: "carrier/engine.ts",
     allowed: ["./action-schema", "../money", "../rule-evaluation", "../zone-matching"],
   },
+  // Explain traces (008 §A4): app-side pure glue over the shared evaluators
+  // and the carrier engine's detailed pipeline — never bundled into WASM.
+  {
+    file: "rule-explain.ts",
+    allowed: ["./rule-evaluation", "./zone-matching", "./carrier/engine"],
+  },
 ];
 
 /** Specifiers that must never appear in a pure module. */

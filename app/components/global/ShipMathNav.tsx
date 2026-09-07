@@ -42,7 +42,7 @@
           </div>
         ),
       },
-            {
+      {
         id: "Rules",
         accessibilityLabel: "Rules",
         panelID: "rules",
@@ -51,6 +51,30 @@
           <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
             <Icon source={AdjustIcon} />
             Rules
+          </div>
+        ),
+      },
+      {
+        id: "simulator",
+        accessibilityLabel: "Rate simulator",
+        panelID: "simulator",
+        url: "/app/simulator",
+        content: (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+            <Icon source={PriceListFilledIcon} />
+            Simulator
+          </div>
+        ),
+      },
+      {
+        id: "logs",
+        accessibilityLabel: "Request log",
+        panelID: "logs",
+        url: "/app/logs",
+        content: (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.2rem" }}>
+            <Icon source={ChartCohortIcon} />
+            Logs
           </div>
         ),
       },

@@ -114,6 +114,27 @@ The **Evaluation mode** dropdown in the Environment card decides how many rules 
 
 The full explanation, with examples, is in [Test mode and evaluation mode](test-mode.md).
 
+## Preview with the simulator
+
+Before you trust a rule at checkout, you can watch it run. Open the [Simulator](simulator.md) page, build a pretend cart, and ShipMath will show you what your rules would do, without a real order anywhere in sight.
+
+The simulator will accept:
+
+- **Cart lines**: picked from your catalog with real prices and weights, or typed in by hand, with optional SKUs, vendors, and product tags for the conditions that look at them.
+- **Destination**: a full checkout-style address form, with a shortcut that fills the country from one of your Shopify shipping zones.
+- **Location and customer**: a pickup location, plus a guest, a dummy tagged tester, or one of your real customers with their tags.
+- **Which rules run**: every rule by default, or just the ones you tick, which is the fastest way to debug a single rule.
+
+Click **Run simulation** and the results will show three things:
+
+- **Carrier rates returned**: the prices your carrier rate rules would hand to checkout for that cart.
+- **Function operations**: the hides, renames, and moves checkout would apply.
+- **A rule-by-rule trace**: every rule in both lanes with a badge. Green means it matched (and, for carrier rules, produced a rate); gray means it did not, with the exact condition or zone that stopped it.
+
+The simulator runs the exact same engine checkout uses, so what you see is what customers would get. Test mode changes nothing here: while test mode is on, live checkout will apply nothing, and the simulator will keep previewing. Every run will be saved on the [Request log](logs.md) page. The full walkthrough lives in [The rate simulator](simulator.md).
+
+[Add Rate Simulator Screenshot]
+
 ## Video tutorial
 
 [Add Shipping Rules Video Tutorial]

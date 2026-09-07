@@ -10,7 +10,7 @@ import prisma from "./db.server";
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
-  apiVersion: ApiVersion.January25,
+  apiVersion: ApiVersion.January26,
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
@@ -26,7 +26,7 @@ const shopify = shopifyApp({
 });
 
 export default shopify;
-export const apiVersion = ApiVersion.January25;
+export const apiVersion = ApiVersion.January26;
 /** Shared app secret — carrier callback HMAC verification (spec 007, architecture §A3). */
 export const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;

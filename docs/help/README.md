@@ -16,6 +16,8 @@ Once you know the basics, these guides will cover the day to day work:
 - [Shipping rules](rules.md) will show you how to hide, rename, move, or reprice delivery options at checkout.
 - [Syncing your changes](sync.md) will explain how your saved rules reach the checkout, and what the warnings mean.
 - [Test mode and evaluation mode](test-mode.md) will help you try new ideas safely, and choose how many rules apply to an order.
+- [The rate simulator](simulator.md) will run your rules against a pretend order, with real products and a checkout-style summary, before you touch the checkout.
+- [The request log](logs.md) will show you what happened on every live checkout call and simulator run, so you can trace any rate back to the rule that produced it.
 - [FAQ](faq.md) has short answers about uninstalling, limits, and what happens when things go wrong.
 
 ## The app at a glance
@@ -24,8 +26,11 @@ You will find a small menu at the top of every page:
 
 | Page | What you will do there |
 | --- | --- |
-| Dashboard | See all your rules, check sync health, and spot the test mode state |
+| Dashboard | See all your rules, check sync health, simulate rates, and spot the test mode state |
 | Zones | Manage the groups of destinations your rules can target |
+| Rules | Build and edit the rules themselves on their own pages |
+| Simulator | Run your rules against a pretend order and watch the results, rate by rate |
+| Logs | Trace every live checkout call and simulator run, rule by rule |
 | Settings | Turn test mode on or off and control when carrier rates go live |
 | Contact | Send a message when you are stuck |
 
