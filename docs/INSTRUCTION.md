@@ -63,6 +63,17 @@ mutation collectionCreate($input: CollectionInput!) {
 `;
 ```
 
+## Documentation
+- User-facing help documentation lives in **`docs/help/`** and must follow eight binding rules (user directive 2026-09-07):
+  1. Point of view is **you/your** — write directly to the store owner.
+  2. Use VISIBLE placeholders in square brackets where screenshots go, like `[Add Zone Condition Screenshot]`. Never hide them in HTML comments (they are invisible when rendered).
+  3. Every document has a **Video tutorial** section with a visible placeholder, like `[Add Getting Started Video Tutorial]`.
+  4. Prefer how-to / doc-blog style: short intro, headed steps, what-to-read-next.
+  5. **Docs ship with code** — finishing a task or changing app behavior includes updating the affected `docs/help/` pages in the same run.
+  6. Always check grammar and use easy-to-read English words.
+  7. Never use the word "we" (or "us"/"our") in help content — the docs are for the merchant, not the developer.
+  8. Never use em-dashes in help content.
+
 ## Sub-Agents
 Create the following agent definition files, each configured with the selected model for its role:
 

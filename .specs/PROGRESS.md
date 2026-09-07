@@ -141,6 +141,31 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
 - Reviewer pass pending (rate-limited session) — flag for next orchestrator
   run to append verdict.
 
+## Help center docs — Orchestrator run 2026-09-07 (user directive)
+
+- ✅ Investigation: documentation agent had never been dispatched and its old
+  output contract pointed at unbuilt artifacts (spec 010 surfaces, spec 016
+  CSV schema) — nothing to write yet. Also fixed stale `GLM-4.7 (zai)` model
+  names in `documentation.agent.md` that would have silently fallen back.
+- ✅ NEW `docs/help/` user-facing help center (7 pages): README index,
+  getting-started, zones, rules, sync, test-mode, faq. All follow the six
+  binding style rules (you/your POV, SCREENSHOT placeholders, Video tutorial
+  section, how-to style, docs-ship-with-code, plain English). Content
+  verified against routes/components (labels: "New rule", "Sync now", "Sync
+  config to checkout", "Add sample rules", "Turn on test mode"/"Go live",
+  kinds HIDE/RENAME/MOVE/CARRIER_RATE, 50/page, 9,500-byte budget).
+- ✅ `documentation.agent.md` updated: docs/help/ ownership, six style rules
+  (binding), output contract enforces them, model names fixed.
+- ✅ `docs/INSTRUCTION.md` gained a Documentation section with the six rules.
+- ✅ Revision (same day, user feedback): help docs rewritten for
+  non-technical readers; placeholders are now VISIBLE `[Add ... Screenshot]` /
+  `[Add ... Video Tutorial]` markers (HTML comments were invisible when
+  rendered); rules grew to eight binding items (no "we/us/our", no em-dashes
+  in help content); documentation.agent.md model names re-fixed to plain GLM
+  ids after they reverted.
+- Standing duty for every future run: code changed → update affected
+  `docs/help/` pages in the same run.
+
 ## 002 — Data model & config store — ✅ (this lane)
 
 - ✅ Prisma models: `Shop`, `Zone`, `ShippingRule`, `RequestLog`, `AuditLog`, `AiUsageDay`
