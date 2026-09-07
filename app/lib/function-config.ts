@@ -35,6 +35,8 @@ import { z } from "zod";
 import { SET_FUNCTION_METAFIELDS } from "../graphql/metafields";
 import { collectTags, MAX_TAGS_PER_LIST, type TagTruncation } from "./tag-collection";
 import { SOFT_CAP_BYTES } from "./budget";
+import type { WireCondition, WireConditionGroup, WireConditionField, WireOperator, WireZone } from "./rule-evaluation";
+import type { WirePostalRule } from "./zone-matching";
 
 // ---------------------------------------------------------------------------
 // Constants — platform limits (see architecture.md §A1)
@@ -74,7 +76,7 @@ const POSTAL_MODE_TO_WIRE: Record<string, "E" | "P" | "R" | "C"> = {
   PARTIAL: "C",
 };
 
-const CONDITION_FIELD_TO_WIRE: Record<string, string> = {
+const CONDITION_FIELD_TO_WIRE: Record<string, WireConditionField> = {
   subtotal: "subtotal",
   weight: "weight",
   quantity: "quantity",
@@ -85,7 +87,7 @@ const CONDITION_FIELD_TO_WIRE: Record<string, string> = {
   logged_in: "auth",
 };
 
-const OPERATOR_TO_WIRE: Record<string, string> = {
+const OPERATOR_TO_WIRE: Record<string, WireOperator> = {
   eq: "=",
   neq: "!=",
   gt: ">",
@@ -108,7 +110,7 @@ const FUNCTION_UNSUPPORTED_FIELDS = new Set([
   "destination_postal",
 ]);
 
-function toWireConditionGroup(raw: string): { o: "A" | "O"; n: unknown[] } | undefined {
+function toWireConditionGroup(raw: string): WireConditionGroup | undefined {
   const group = parseStoredJson(raw, ConditionGroupSchema);
   const converted = convertGroup(group as unknown as ConditionGroup);
   if (!converted || converted.n.length === 0) {
@@ -116,9 +118,10 @@ function toWireConditionGroup(raw: string): { o: "A" | "O"; n: unknown[] } | und
   }
   return converted;
 }
+export { toWireConditionGroup };
 
-function convertGroup(group: ConditionGroup): { o: "A" | "O"; n: unknown[] } | undefined {
-  const nodes: unknown[] = [];
+function convertGroup(group: ConditionGroup): WireConditionGroup | undefined {
+  const nodes: (WireCondition | WireConditionGroup)[] = [];
   for (const node of group.conditions) {
     if ("combinator" in node) {
       const nested = convertGroup(node as ConditionGroup);
@@ -144,6 +147,57 @@ function groupUsesUnsupportedFields(group: ConditionGroup): boolean {
       ? groupUsesUnsupportedFields(node as ConditionGroup)
       : FUNCTION_UNSUPPORTED_FIELDS.has((node as Condition).field),
   );
+}
+
+/** Minimal zone-row shape both lanes convert (Prisma Zone subset). */
+export interface ZoneRowLike {
+  id: string;
+  countries: string;
+  provinces: string;
+  postalRules: string;
+}
+
+/**
+ * Stored zones → wire zones + prismaId→shortId map. SHARED by the Function
+ * mirror and the carrier callback lane (spec 007) — one implementation, so
+ * the two lanes can never drift (architecture §A4).
+ */
+export function buildWireZones(
+  zones: ZoneRowLike[],
+  referencedZoneIds: Set<string>,
+): { wireZones: WireZone[]; idMap: Map<string, string> } {
+  const wireZones: WireZone[] = [];
+  const idMap = new Map<string, string>();
+  for (const zone of zones) {
+    if (!referencedZoneIds.has(zone.id)) {
+      continue; // don't mirror zones no rule uses — bytes are precious
+    }
+    let postalRules: PostalRule[];
+    try {
+      postalRules = z.array(PostalRuleSchema).parse(JSON.parse(zone.postalRules));
+    } catch {
+      postalRules = [];
+    }
+    const shortId = `z${wireZones.length + 1}`;
+    idMap.set(zone.id, shortId);
+    wireZones.push({
+      i: shortId,
+      ...(zone.countries && zone.countries !== "null" ? { c: safeJsonArray(zone.countries) } : {}),
+      ...(zone.provinces && zone.provinces !== "null" ? { p: safeJsonArray(zone.provinces) } : {}),
+      ...(postalRules.length > 0
+        ? {
+            pc: postalRules.map((rule) => {
+              const wire: WirePostalRule = { m: POSTAL_MODE_TO_WIRE[rule.mode] || "E", x: rule.value };
+              if (rule.mode === "RANGE" && rule.rangeEnd) {
+                wire.e = rule.rangeEnd;
+              }
+              return wire;
+            }),
+          }
+        : {}),
+    });
+  }
+  return { wireZones, idMap };
 }
 
 export interface BuiltFunctionConfig {
@@ -173,41 +227,10 @@ export async function buildFunctionConfig(
   });
 
   const excluded: BuiltFunctionConfig["excluded"] = [];
-  const wireZones: unknown[] = [];
-  const zoneIdToIndex = new Map<string, string>();
   const referencedZoneIds = new Set(
     shop.rules.map((rule) => rule.zoneId).filter((id): id is string => Boolean(id)),
   );
-
-  for (const zone of shop.zones) {
-    if (!referencedZoneIds.has(zone.id)) {
-      continue; // don't mirror zones no rule uses — bytes are precious
-    }
-    let postalRules: PostalRule[];
-    try {
-      postalRules = z.array(PostalRuleSchema).parse(JSON.parse(zone.postalRules));
-    } catch {
-      postalRules = [];
-    }
-    const shortId = `z${wireZones.length + 1}`;
-    zoneIdToIndex.set(zone.id, shortId);
-    wireZones.push({
-      i: shortId,
-      ...(zone.countries && zone.countries !== "null" ? { c: safeJsonArray(zone.countries) } : {}),
-      ...(zone.provinces && zone.provinces !== "null" ? { p: safeJsonArray(zone.provinces) } : {}),
-      ...(postalRules.length > 0
-        ? {
-            pc: postalRules.map((rule) => {
-              const wire: Record<string, string> = { m: POSTAL_MODE_TO_WIRE[rule.mode] || "E", x: rule.value };
-              if (rule.mode === "RANGE" && rule.rangeEnd) {
-                wire.e = rule.rangeEnd;
-              }
-              return wire;
-            }),
-          }
-        : {}),
-    });
-  }
+  const { wireZones, idMap: zoneIdToIndex } = buildWireZones(shop.zones, referencedZoneIds);
 
   const wireRules: unknown[] = [];
   const productTags = new Set<string>();

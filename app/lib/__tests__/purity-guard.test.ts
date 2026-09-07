@@ -28,6 +28,14 @@ const PURE_MODULES: Array<{ file: string; allowed: readonly string[] }> = [
   { file: "tag-collection.ts", allowed: ["./config-schema"] },
   // zod is the only dependency (schema must stay WASM-bundleable for 007).
   { file: "carrier/action-schema.ts", allowed: ["zod"] },
+  // Zero imports — decimal-string arithmetic shared by the carrier engine.
+  { file: "money.ts", allowed: [] },
+  // Carrier rate engine (007 §A3): pure sibling modules only — the action
+  // schema, money math, rule evaluation, and zone matching.
+  {
+    file: "carrier/engine.ts",
+    allowed: ["./action-schema", "../money", "../rule-evaluation", "../zone-matching"],
+  },
 ];
 
 /** Specifiers that must never appear in a pure module. */

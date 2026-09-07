@@ -41,6 +41,7 @@ export async function getOrCreateShop(shopDomain: string): Promise<{
   functionOwnerId: string | null;
   functionSyncedAt: Date | null;
   onboardedAt: Date | null;
+  carrierServiceId: string | null;
 }> {
   const existing = await prisma.shop.findUnique({ where: { shopDomain } });
   if (existing) {

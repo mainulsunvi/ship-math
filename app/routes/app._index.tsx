@@ -54,7 +54,6 @@ import {
   type RuleKind,
 } from "../lib/config-schema";
 import ShipMathPage from "../components/global/ShipMathPage";
-import SettingToggle from "../components/ui/SettingToggle";
 import SyncStatusCard from "../components/rules/SyncStatusCard";
 import RulesTable, { type RuleRow } from "../components/rules/RulesTable";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
@@ -317,20 +316,6 @@ async function handleSeedIntent(admin: AdminApiClient, shop: ShopRef) {
   });
 }
 
-async function handleTestModeIntent(admin: AdminApiClient, shop: ShopRef, formData: FormData) {
-  const next = formData.get("value") === "1";
-  await prisma.shop.update({ where: { id: shop.id }, data: { testMode: next } });
-  const sync = await syncAfterOwnerEnsure(admin, shop.id);
-  await writeAudit(
-    shop.id,
-    "MERCHANT",
-    next ? "Test mode enabled" : "Test mode disabled",
-    { testMode: !next },
-    { testMode: next },
-  );
-  return json<ActionReply>({ ok: true, sync });
-}
-
 // The load-bearing order for every rule mutation (architecture §A1):
 //   1. repository call (Prisma, source of truth)
 //   2. ensureFunctionOwner
@@ -490,9 +475,6 @@ export async function action({ request }: ActionFunctionArgs) {
     if (intent === "seed") {
       return await handleSeedIntent(admin, shop);
     }
-    if (intent === "testMode") {
-      return await handleTestModeIntent(admin, shop, formData);
-    }
     if (intent === "rule-create") {
       return await handleRuleCreate(admin, shop.id, formData);
     }
@@ -577,13 +559,6 @@ export default function Index() {
     tableFetcher.submit({ intent: "seed" }, { method: "post" });
   }, [tableFetcher]);
 
-  const toggleTestMode = useCallback(function toggleTestModeNow() {
-    tableFetcher.submit(
-      { intent: "testMode", value: loaderData.testMode ? "0" : "1" },
-      { method: "post" },
-    );
-  }, [tableFetcher, loaderData.testMode]);
-
   function openNewRule() {
     navigate("/app/rules/new");
   }
@@ -636,7 +611,6 @@ export default function Index() {
             busy={busy}
             onSync={sync}
             onSeed={seed}
-            onToggleTestMode={toggleTestMode}
           />
         </Layout.Section>
 
@@ -658,13 +632,10 @@ export default function Index() {
                     : "Only the first matching rule (lowest priority number) applies."
                 }
               />
-              <SettingToggle
-                label="Test mode"
-                helpText="The checkout Function applies no operations; rules are previewed in the simulator."
-                enabled={loaderData.testMode}
-                disabled={busy}
-                onChange={toggleTestMode}
-              />
+              <Text as="p" variant="bodySm">
+                Test mode: {loaderData.testMode ? "ON" : "off"} ·{" "}
+                <Link url="/app/settings">manage in Settings</Link>
+              </Text>
               <Text as="p" variant="bodySm" tone="subdued">
                 {loaderData.ruleCount} function rule(s) enabled · soft cap {RULES_SOFT_CAP} rules.
               </Text>

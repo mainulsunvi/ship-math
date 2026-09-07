@@ -30,7 +30,6 @@ interface SyncStatusCardProps {
   busy: boolean;
   onSync(): void;
   onSeed(): void;
-  onToggleTestMode(): void;
 }
 
 export default function SyncStatusCard({
@@ -45,7 +44,6 @@ export default function SyncStatusCard({
   busy,
   onSync,
   onSeed,
-  onToggleTestMode,
 }: SyncStatusCardProps) {
   const budgetPct = Math.min(100, Math.round((bytes / cap) * 100));
 
@@ -96,10 +94,11 @@ export default function SyncStatusCard({
           <Button loading={busy} onClick={onSeed}>
             Add sample rules
           </Button>
-          <Button loading={busy} onClick={onToggleTestMode}>
-            {testMode ? "Go live" : "Turn on test mode"}
-          </Button>
         </InlineStack>
+        <Text as="p" variant="bodySm" tone="subdued">
+          Test mode is {testMode ? "ON (the Function applies no operations)" : "off"} ·{" "}
+          go-live and test mode are managed in Settings.
+        </Text>
       </BlockStack>
     </Card>
   );

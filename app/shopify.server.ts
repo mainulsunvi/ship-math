@@ -27,6 +27,8 @@ const shopify = shopifyApp({
 
 export default shopify;
 export const apiVersion = ApiVersion.January25;
+/** Shared app secret — carrier callback HMAC verification (spec 007, architecture §A3). */
+export const API_SECRET = process.env.SHOPIFY_API_SECRET || "";
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
