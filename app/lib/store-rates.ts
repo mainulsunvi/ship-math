@@ -283,9 +283,13 @@ export interface StoreRateContext {
 
 /**
  * Which store rates apply to this cart + destination: the zone must cover
- * the country (rest-of-world zones cover any country; province-restricted
- * entries need a matching province), and the cart must fall inside the
- * method's subtotal/weight window (bounds inclusive).
+ * the country (rest-of-world zones cover any country; a NAMED province must
+ * be covered by the zone's province list), and the cart must fall inside
+ * the method's subtotal/weight window (bounds inclusive). A destination
+ * without a province passes the province gate: Shopify lists every
+ * subdivision of a country added whole to a zone, so a full list cannot be
+ * told apart from a deliberate restriction, and real checkout addresses in
+ * subdivided countries always carry a province.
  */
 export function pickStoreRates(
   options: StoreRateOption[],
@@ -306,7 +310,15 @@ export function pickStoreRates(
         if (!entry.provinces || entry.provinces.length === 0) {
           return true;
         }
-        return province !== null && entry.provinces.includes(province);
+        // Shopify returns EVERY subdivision when a whole country is added to
+        // a zone (verified 2026-09-08 against a live store: a US-wide zone
+        // carries 62 province codes), so a full list is indistinguishable
+        // from a deliberate restriction. The destination shortcut fills only
+        // the country, and checkout addresses in subdivided countries always
+        // carry a province, so a missing province fails OPEN here: the gate
+        // restricts only a destination that names a province the zone does
+        // not cover.
+        return province === null || entry.provinces.includes(province);
       });
     if (!inZone) {
       return false;

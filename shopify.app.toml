@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "b86467e609d77f4530dc6649785b6cea"
-name = "ShipMath"
+name = "ShipMath: Smart Shipping Rules"
 application_url = "https://example.com"
 embedded = true
 handle = "ship-math"

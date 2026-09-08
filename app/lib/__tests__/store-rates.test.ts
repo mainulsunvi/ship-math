@@ -290,7 +290,7 @@ describe("pickStoreRates", function testFiltering() {
     })).not.toContain("Standard");
   });
 
-  it("requires a matching province when the zone restricts them", function provinceRestriction() {
+  it("requires a matching province when the zone restricts them and the destination names one", function provinceRestriction() {
     const restricted = storeRatesFromZones([
       {
         id: "gid://shopify/DeliveryZone/8",
@@ -315,7 +315,104 @@ describe("pickStoreRates", function testFiltering() {
     ]);
     expect(pickStoreRates(restricted, { ...US_CART, province: "NY" })).toHaveLength(1);
     expect(pickStoreRates(restricted, { ...US_CART, province: "CA" })).toHaveLength(0);
-    expect(pickStoreRates(restricted, { ...US_CART, province: null })).toHaveLength(0);
+    // A destination without a province passes the gate: Shopify returns the
+    // full subdivision list for whole-country zones, so the gate cannot tell
+    // a full list from a restriction and checkout addresses always name one.
+    expect(pickStoreRates(restricted, { ...US_CART, province: null })).toHaveLength(1);
+  });
+
+  it("shows whole-country zone rates to a province-less destination when Shopify returns the full subdivision list", function wholeCountryFullList() {
+    // Regression (2026-09-08): a live store's US-wide "Domestic" zone came
+    // back with ALL 62 US subdivision codes, and the destination shortcut
+    // fills only the country. Every domestic rate was dropped, leaving one
+    // rest-of-world "International Shipping" rate in the box.
+    const allStates = [
+      "AL","AK","AS","AZ","AR","AA","AE","AP","CA","CO","CT","DE","DC","FM",
+      "FL","GA","GU","HI","ID","IL","IN","IA","KS","KY","LA","ME","MH","MD",
+      "MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND",
+      "MP","OH","OK","OR","PW","PA","PR","RI","SC","SD","TN","TX","UT","VT",
+      "VI","VA","WA","WV","WI","WY",
+    ].map(function code(entry) {
+      return { code: entry };
+    });
+    const rates = storeRatesFromZones([
+      {
+        id: "gid://shopify/DeliveryZone/900",
+        name: "Domestic",
+        countries: [{ code: { countryCode: "US", restOfWorld: false }, provinces: allStates }],
+        methodDefinitions: {
+          edges: [
+            {
+              node: {
+                id: "gid://shopify/DeliveryMethodDefinition/901",
+                name: "Standard",
+                active: true,
+                methodConditions: [],
+                rateProvider: { price: { amount: "8.00" } },
+              },
+            },
+            {
+              node: {
+                id: "gid://shopify/DeliveryMethodDefinition/902",
+                name: "Express",
+                active: true,
+                methodConditions: [],
+                rateProvider: { price: { amount: "15.00" } },
+              },
+            },
+          ],
+        },
+      },
+      {
+        id: "gid://shopify/DeliveryZone/903",
+        name: "International",
+        countries: [{ code: { countryCode: null, restOfWorld: true }, provinces: [] }],
+        methodDefinitions: {
+          edges: [
+            {
+              node: {
+                id: "gid://shopify/DeliveryMethodDefinition/904",
+                name: "Free International Shipping",
+                active: true,
+                methodConditions: [
+                  {
+                    field: "TOTAL_WEIGHT",
+                    operator: "GREATER_THAN_OR_EQUAL_TO",
+                    conditionCriteria: { __typename: "Weight", unit: "KILOGRAMS", value: "20" },
+                  },
+                ],
+                rateProvider: { price: { amount: "0.00" } },
+              },
+            },
+            {
+              node: {
+                id: "gid://shopify/DeliveryMethodDefinition/905",
+                name: "International Shipping",
+                active: true,
+                methodConditions: [],
+                rateProvider: { price: { amount: "30.00" } },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    // The shortcut-filled destination: country only, no province, starter
+    // cart of $30 / 1 kg. Both domestic rates survive; the rest-of-world
+    // zone matches every country, so its unconditional rate rides along
+    // (checkout shows every matching zone) and the weight-gated one waits
+    // for 20 kg.
+    const picked = pickStoreRates(rates, { country: "US", province: null, subtotal: 30, weightGrams: 1000 });
+    expect(
+      picked.map(function title(rate) {
+        return rate.title;
+      }),
+    ).toEqual(["Standard", "Express", "International Shipping"]);
+    // A named state still has to be covered by the list.
+    expect(pickStoreRates(rates, { country: "US", province: "CA", subtotal: 30, weightGrams: 1000 })).toHaveLength(3);
+    expect(pickStoreRates(rates, { country: "DE", province: null, subtotal: 30, weightGrams: 1000 }).map(function title(rate) {
+      return rate.title;
+    })).toEqual(["International Shipping"]);
   });
 
   it("covers any country through a rest-of-world zone", function restOfWorld() {

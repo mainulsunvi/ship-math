@@ -75,6 +75,8 @@ The right column starts with an **Order summary** that mirrors checkout:
 
 The store's own methods behave like checkout too: the destination has to fall inside one of your Shopify shipping zones (including Markets-based shipping), the cart has to satisfy each method's minimum or maximum order amount and weight window, and your hide, rename, and move rules will remove, retitle, or reorder them exactly as they would at checkout. A method that disappeared from the box is a real result: the delivery customizations list below the box will name the rule that hid it.
 
+One checkout behavior surprises many store owners: a zone that covers the rest of the world matches every address, so its methods (like International Shipping) will appear next to your domestic ones even when the destination is domestic. That is not a mistake. Checkout shows the rates of every zone that matches the address, and ShipMath's preview shows the same combined list. If you do not want international rates on domestic orders, tighten the rest-of-world zone in Shopify, or add conditions to those rates.
+
 If ShipMath cannot read the store's shipping setup at all, a warning banner at the top of the page will say why, and the rates box will show only rule-based rates. The most common reason is a missing permission: reinstall the app or rerun shopify app dev so the shipping permissions are granted, then reload the page.
 
 ### Delivery customizations, spelled out
