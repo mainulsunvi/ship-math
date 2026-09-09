@@ -557,6 +557,13 @@ UI editor designed — `plans/004-005-plan.md`)
   layout (StepHeader → one Card body → muted footnote outside); Rates' two
   cards merged into one with a divider; Carrier/TestMode/Plan footnotes moved
   outside their cards; Welcome/Done card-wrapped.
+- ✅ Carrier/TestMode alignment round 2 (user report "carrier rates design not
+  fixed yet"): Carrier's 3-line header description → one-liner, and its lone
+  toggle now sits under an explanation paragraph + divider (structure mirrors
+  the Plan card exactly); TestMode got the same treatment (one-line header,
+  state paragraph + divider + preview guidance in the card). Every step header
+  is now a single line; every card has text content above its interactive
+  part. Gates: tsc 0 · 329 tests · build clean.
 - ✅ Inline zone form (user report, same day): zones no longer stack a second
   modal on the wizard. NEW `app/components/zones/ZoneForm.tsx` = the full
   form extracted from ZoneEditorModal (RuleForm conventions: parent owns the

@@ -253,7 +253,7 @@ function SetupWizard({ shopName, planClass, testMode, zones, draftRules }: Setup
         ]}
       >
         <Modal.Section>
-          <BlockStack gap="500">
+          <BlockStack gap="800">
             <WizardProgress steps={steps} currentIndex={safeStepIndex} />
             {step.id === "welcome" ? (
               <StepWelcome shopName={shopName} carrierStepIncluded={carrierOffered} />

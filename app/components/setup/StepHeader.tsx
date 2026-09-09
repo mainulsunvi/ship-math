@@ -16,7 +16,7 @@ interface StepHeaderProps {
  */
 function StepHeader({ icon, title, description }: StepHeaderProps) {
   return (
-    <InlineStack gap="300" blockAlign="center">
+    <InlineStack gap="300" blockAlign="center" wrap={false}>
       <span className="sm-wizard-tile" aria-hidden="true">
         <Icon source={icon} />
       </span>
