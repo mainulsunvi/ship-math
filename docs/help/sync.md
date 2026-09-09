@@ -13,7 +13,7 @@ You will almost never have to press anything, because syncing is automatic. You 
 
 ## Reading the status card
 
-The **Checkout Function status** card sits at the top of the Dashboard. Each line tells you something useful:
+The **Checkout Function Status** card sits at the top of the Dashboard. Each line tells you something useful:
 
 - **Delivery customization owner**: this is the checkout side of ShipMath. It will say "No owner yet" until your first sync creates it, and after that it will turn into a green badge.
 - **Function rules enabled**: how many of your rules are live at checkout right now.

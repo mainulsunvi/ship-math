@@ -183,7 +183,7 @@ function parseConditionsField(
   try {
     const result = ConditionGroupSchema.safeParse(JSON.parse(String(formData.get("conditions") ?? "null")));
     if (!result.success) {
-      return { ok: false, message: `Conditions failed validation — ${zodIssuesText(result.error)}` };
+      return { ok: false, message: `Conditions failed validation: ${zodIssuesText(result.error)}` };
     }
     return { ok: true, value: result.data as RuleInput["conditions"] };
   } catch {
@@ -202,7 +202,7 @@ function parseActionField(
         ? CarrierRateActionSchema.safeParse(rawAction)
         : ActionSchema.safeParse(rawAction);
     if (!result.success) {
-      return { ok: false, message: `Action failed validation — ${zodIssuesText(result.error)}` };
+      return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
     }
     return { ok: true, value: result.data as RuleInput["action"] };
   } catch {
@@ -584,7 +584,7 @@ export default function Index() {
 
   return (
     <ShipMathPage
-      title="Shipping rules"
+      title="Shipping Rules"
       subtitle="Control how delivery options are shown and priced at checkout"
       primaryAction={{ content: "New rule", onAction: openNewRule, loading: busy }}
       secondaryActions={[
@@ -632,11 +632,14 @@ export default function Index() {
                 }
               />
               <Text as="p" variant="bodySm">
-                Test mode: {loaderData.testMode ? "ON" : "off"} ·{" "}
+                Test mode: {loaderData.testMode ? "On" : "Off"} ·{" "}
                 <Link url="/app/settings">manage in Settings</Link>
               </Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                {loaderData.ruleCount} function rule(s) enabled · soft cap {RULES_SOFT_CAP} rules.
+                {loaderData.ruleCount === 1
+                  ? "1 function rule enabled"
+                  : `${loaderData.ruleCount} function rules enabled`}{" "}
+                · soft cap {RULES_SOFT_CAP} rules.
               </Text>
             </BlockStack>
           </Card>
@@ -653,7 +656,7 @@ export default function Index() {
             {syncFailure ? (
               <Banner
                 tone="critical"
-                title="Checkout mirror out of date"
+                title="Checkout Mirror Out of Date"
                 action={{ content: "Retry sync", onAction: sync }}
               >
                 <Text as="p" variant="bodySm">
@@ -665,20 +668,20 @@ export default function Index() {
             <SyncReportWarnings sync={syncSuccess} />
             {loaderData.stale && !busy ? (
               <Banner tone="warning">
-                Configuration changed since the last sync — checkout is still
+                Configuration changed since the last sync. Checkout is still
                 using the previous rules until you sync.
               </Banner>
             ) : null}
             {loaderData.testMode ? (
               <Banner tone="info">
-                Test mode is ON: the checkout Function applies no operations.
+                Test mode is on: the checkout Function applies no operations.
                 Rules are previewed in the simulator.
               </Banner>
             ) : null}
             {loaderData.total >= RULES_CAP_WARN ? (
-              <Banner tone="warning" title="Approaching the rule soft cap">
+              <Banner tone="warning" title="Approaching the Rule Soft Cap">
                 {loaderData.total} of {RULES_SOFT_CAP} rules. Sync size and evaluation time grow
-                with rule count — archive or merge rules you no longer need.
+                with rule count. Archive or merge rules you no longer need.
               </Banner>
             ) : null}
             <Card>
@@ -694,7 +697,10 @@ export default function Index() {
                     </Button>
                   </InlineStack>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    {loaderData.total} rule(s) · page {loaderData.page} of {loaderData.totalPages}
+                    {loaderData.total === 1
+                      ? "1 rule"
+                      : `${loaderData.total} rules`}{" "}
+                    · page {loaderData.page} of {loaderData.totalPages}
                   </Text>
                 </InlineStack>
                 {loaderData.rules.length === 0 ? (
@@ -757,13 +763,13 @@ export default function Index() {
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">
-                How this works
+                How This Works
               </Text>
               <Text as="p" variant="bodySm">
                 Rules live in the database (source of truth). Every change re-pushes a
                 compact copy to a Shopify-managed metafield on your delivery
                 customization; the checkout Function reads it live on every
-                checkout — no redeploy needed.
+                checkout. No redeploy is needed.
               </Text>
               <Text as="p" variant="bodySm">
                 If the metafield is missing or unreadable, checkout shows stock
@@ -780,7 +786,7 @@ export default function Index() {
           onClose={function closeDelete() {
             setDeleteTarget(null);
           }}
-          title="Delete rule?"
+          title="Delete Rule?"
           primaryAction={{ content: "Delete rule", destructive: true, onAction: confirmDelete, loading: busy }}
           secondaryActions={[
             {

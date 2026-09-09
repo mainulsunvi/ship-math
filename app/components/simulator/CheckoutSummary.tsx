@@ -123,7 +123,7 @@ function CheckoutSummary({
     <BlockStack gap="300">
       <BlockStack gap="100">
         <Text as="h3" variant="headingSm">
-          Ship to
+          Ship To
         </Text>
         {shipToLines.length === 0 ? (
           <Text as="p" variant="bodySm" tone="subdued">
@@ -229,17 +229,17 @@ function CheckoutSummary({
 
       <BlockStack gap="150">
         <Text as="h3" variant="headingSm">
-          Shipping rates
+          Shipping Rates
         </Text>
         {!result ? (
           <Text as="p" variant="bodySm" tone="subdued">
             Run the simulation and checkout's shipping options will appear
-            here — the store's own methods plus the rates your rules return,
+            here: the store's own methods plus the rates your rules return,
             pickable like checkout.
           </Text>
         ) : options.length === 0 ? (
           <Text as="p" variant="bodySm" tone="subdued">
-            No shipping options for this cart and destination — either no rate
+            No shipping options for this cart and destination. Either no rate
             applies, or a hide rule removed every option.
           </Text>
         ) : (
@@ -249,7 +249,7 @@ function CheckoutSummary({
                 <InlineStack key={option.code} gap="200" blockAlign="center">
                   <div style={{ flexGrow: 1 }}>
                     <RadioButton
-                      label={`${option.title} — ${money(option.price, currency)}`}
+                      label={`${option.title} (${money(option.price, currency)})`}
                       labelHidden={false}
                       name="simulator-rate"
                       value={option.code}
@@ -260,7 +260,7 @@ function CheckoutSummary({
                     />
                   </div>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    {option.source === "STORE" ? "store" : "rule"}
+                    {option.source === "STORE" ? "Store" : "Rule"}
                   </Text>
                 </InlineStack>
               );
@@ -274,12 +274,12 @@ function CheckoutSummary({
           <Divider />
           <BlockStack gap="100">
             <Text as="h3" variant="headingSm">
-              Delivery customizations
+              Delivery Customizations
             </Text>
             {customizations.length === 0 ? (
               <Text as="p" variant="bodySm" tone="subdued">
-                Customization rules ran but matched no shipping option here —
-                check each rule&apos;s option filters.
+                Customization rules ran but matched no shipping option here.
+                Check each rule&apos;s option filters.
               </Text>
             ) : (
               customizations.map(function renderCustomization(entry, index) {

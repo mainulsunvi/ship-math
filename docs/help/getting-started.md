@@ -21,7 +21,7 @@ You will work with two things. A **zone** is a saved group of places, like "Unit
 2. In your Shopify admin, click **Apps** on the left.
 3. Click **ShipMath**.
 
-You will land on the Dashboard. The **Checkout Function status** card will sit at the top, and below it you will find the **Environment** card and the table with your rules.
+You will land on the Dashboard. The **Checkout Function Status** card will sit at the top, and below it you will find the **Environment** card and the table with your rules.
 
 There is nothing to configure before you start. You can build your first rule right away.
 
@@ -29,7 +29,7 @@ There is nothing to configure before you start. You can build your first rule ri
 
 Would you like to see some finished rules before you build your own? ShipMath will create a few examples for you:
 
-1. Find the **Checkout Function status** card at the top of the Dashboard.
+1. Find the **Checkout Function Status** card at the top of the Dashboard.
 2. Click **Add sample rules**.
 
 ShipMath will add a small set of starter rules within a moment. You can open any of them to see how it is built, change whatever you like, or delete them later. If you prefer to start from a clean slate, skip this step.
@@ -72,7 +72,7 @@ The full guide is [Shipping rules](rules.md).
 
 Your saved rules will live in the app, and the checkout will read its own copy of them. **Syncing** means sending your latest changes to that copy.
 
-You will not have to press anything: ShipMath will sync automatically after almost every action. The **Checkout Function status** card will show when the checkout last received your rules. If a sync ever fails, a banner will appear with a **Retry sync** button, and your changes will still be saved.
+You will not have to press anything: ShipMath will sync automatically after almost every action. The **Checkout Function Status** card will show when the checkout last received your rules. If a sync ever fails, a banner will appear with a **Retry sync** button, and your changes will still be saved.
 
 The full guide is [Syncing your changes](sync.md).
 

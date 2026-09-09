@@ -16,6 +16,8 @@ import {
   type RateMode,
 } from "../../lib/carrier/action-schema";
 import Switch from "../ui/Switch";
+import SettingToggle from "../ui/SettingToggle";
+import HelpTooltip from "../ui/HelpTooltip";
 
 /**
  * Kind-specific THEN editor (spec 005 Task 5):
@@ -56,7 +58,7 @@ const WEIGHT_UNIT_OPTIONS = [
   { label: "per lb", value: "lb" },
 ];
 
-const MONEY_HELP_TEXT = "Decimal string, e.g. 12.50 — stored as text to avoid float rounding.";
+const MONEY_HELP_TEXT = "Enter an amount like 12.50, with no currency symbol.";
 
 // ---------------------------------------------------------------------------
 // Function action drafts (HIDE / RENAME / MOVE)
@@ -308,9 +310,12 @@ export default function ActionEditor({
 
   return (
     <BlockStack gap="300">
-      <Text as="h3" variant="headingSm">
-        Delivery option filters — optional, leave empty to target every option
-      </Text>
+      <InlineStack gap="100" blockAlign="center">
+        <Text as="h3" variant="headingSm">
+          Delivery Option Filters
+        </Text>
+        <HelpTooltip content="Optional. Leave the filters empty to target every delivery option." />
+      </InlineStack>
       <InlineStack gap="300" wrap>
         <Select
           label="Method"
@@ -418,7 +423,7 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
           onChange={function setServiceCode(next: string) {
             patch({ serviceCode: next });
           }}
-          helpText="Stable code used by the carrier callback."
+          helpText="A stable code that identifies this rate at checkout."
           disabled={disabled}
         />
       </InlineStack>
@@ -429,6 +434,7 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
         onChange={function setDescription(next: string) {
           patch({ description: next });
         }}
+        helpText="Optional note shown next to the rate at checkout."
         disabled={disabled}
       />
       <Select
@@ -455,7 +461,7 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
       ) : null}
       {draft.mode === "percentage" ? (
         <TextField
-          label="Percentage (0–100)"
+          label="Percentage (0 to 100)"
           type="number"
           min={0}
           max={100}
@@ -471,7 +477,7 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
       {draft.mode === "tiered" ? (
         <BlockStack gap="200">
           <Text as="h4" variant="headingSm">
-            Tiered bands
+            Tiered Bands
           </Text>
           {draft.tiers.map(function renderTier(tier, index) {
             return (
@@ -552,13 +558,14 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
         </BlockStack>
       ) : null}
       <BlockStack gap="300">
-        <Switch
+        <SettingToggle
           label="Charge per item"
-          checked={draft.perItemEnabled}
+          helpText="Adds the per-item amount to the rate for every item, after the first free ones."
+          enabled={draft.perItemEnabled}
+          disabled={disabled}
           onChange={function togglePerItem(next: boolean) {
             patch({ perItemEnabled: next });
           }}
-          disabled={disabled}
         />
         {draft.perItemEnabled ? (
           <InlineStack gap="300" wrap>
@@ -582,18 +589,19 @@ function CarrierRateFields({ draft, disabled, onChange }: CarrierRateFieldsProps
               onChange={function setFreeItems(next: string) {
                 patch({ perItemFreeItems: next });
               }}
-              helpText="First N items are free (optional)."
+              helpText="Number of first items that are free (optional)."
               disabled={disabled}
             />
           </InlineStack>
         ) : null}
-        <Switch
+        <SettingToggle
           label="Charge per weight"
-          checked={draft.perWeightEnabled}
+          helpText="Adds the per-weight amount for each whole unit of cart weight."
+          enabled={draft.perWeightEnabled}
+          disabled={disabled}
           onChange={function togglePerWeight(next: boolean) {
             patch({ perWeightEnabled: next });
           }}
-          disabled={disabled}
         />
         {draft.perWeightEnabled ? (
           <InlineStack gap="300" wrap>

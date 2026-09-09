@@ -32,6 +32,7 @@ import ActionEditor, {
 import ConditionGroupEditor, { sanitizeConditionsForKind } from "./ConditionGroupEditor";
 import KindChip from "./KindChip";
 import SettingToggle from "../ui/SettingToggle";
+import HelpTooltip from "../ui/HelpTooltip";
 
 /**
  * Reusable rule form — ONE component for both create (/app/rules/new) and
@@ -99,8 +100,10 @@ interface RuleFormProps {
   onCancel(): void;
 }
 
-function RuleFormSection({ label, divider, children }: {
+function RuleFormSection({ label, help, divider, children }: {
   label: string;
+  /** Optional longer explanation, shown through the HelpTooltip icon. */
+  help?: string;
   divider?: boolean;
   children: React.ReactNode;
 }) {
@@ -109,9 +112,12 @@ function RuleFormSection({ label, divider, children }: {
       {divider ? (
         <Box borderBlockStartWidth="025" borderColor="border" />
       ) : null}
-      <Text as="h3" variant="headingSm">
-        {label}
-      </Text>
+      <InlineStack gap="100" blockAlign="center">
+        <Text as="h3" variant="headingSm">
+          {label}
+        </Text>
+        {help ? <HelpTooltip content={help} /> : null}
+      </InlineStack>
       {children}
     </BlockStack>
   );
@@ -234,7 +240,7 @@ export default function RuleForm({
     <Card>
       <BlockStack gap="500">
         {displayErrors.length > 0 ? (
-          <Banner tone="critical" title="Fix before saving">
+          <Banner tone="critical" title="Fix Before Saving">
             <BlockStack gap="100">
               {displayErrors.map(function renderError(message, index) {
                 return (
@@ -249,7 +255,7 @@ export default function RuleForm({
 
         <InlineStack gap="200" blockAlign="center">
           <Text as="h2" variant="headingMd">
-            {mode === "create" ? "New rule" : "Edit rule"}
+            {mode === "create" ? "New Rule" : "Edit Rule"}
           </Text>
           <KindChip kind={kind} />
         </InlineStack>
@@ -258,6 +264,7 @@ export default function RuleForm({
           <InlineStack gap="300" wrap>
             <TextField
               label="Rule name"
+              helpText="Enter a Rule name for reference."
               autoComplete="off"
               value={name}
               onChange={setName}
@@ -268,6 +275,7 @@ export default function RuleForm({
               options={KIND_OPTIONS}
               value={kind}
               onChange={handleKindChange}
+              helpText="What the rule does at checkout."
               disabled={busy}
             />
             <TextField
@@ -277,7 +285,7 @@ export default function RuleForm({
               autoComplete="off"
               value={priority}
               onChange={setPriority}
-              helpText="Lower runs first."
+              helpText="Rules with lower numbers run first."
               disabled={busy}
             />
             <Select
@@ -285,24 +293,38 @@ export default function RuleForm({
               options={zoneOptions}
               value={zoneId}
               onChange={setZoneId}
-              helpText="Optional — narrows the rule to destinations inside the zone."
+              helpText="Optional. Limits the rule to destinations inside the zone."
               disabled={busy}
             />
           </InlineStack>
           <SettingToggle
             label="Stop on match"
-            helpText="In ALL_MATCH mode, lower-priority rules are skipped once this rule matches."
+            helpText='With the "All matches apply" evaluation mode, rules after this one are skipped once it matches.'
             enabled={stopOnMatch}
             disabled={busy}
             onChange={setStopOnMatch}
           />
         </RuleFormSection>
 
-        <RuleFormSection label="IF — conditions" divider>
-          <ConditionGroupEditor group={conditions} depth={1} ruleKind={kind} disabled={busy} onChange={setConditions} />
+        <RuleFormSection
+          label="Conditions"
+          help="The rule runs its action only when these conditions match. An empty group matches every checkout."
+          divider
+        >
+          <ConditionGroupEditor
+            group={conditions}
+            depth={1}
+            ruleKind={kind}
+            disabled={busy}
+            onChange={setConditions}
+          />
         </RuleFormSection>
 
-        <RuleFormSection label="THEN — action" divider>
+        <RuleFormSection
+          label="Action"
+          help="What checkout does with the delivery options when the conditions match."
+          divider
+        >
           <ActionEditor
             kind={kind}
             functionDraft={functionDraft}
@@ -313,7 +335,11 @@ export default function RuleForm({
           />
         </RuleFormSection>
 
-        <Box borderBlockStartWidth="025" borderColor="border" paddingBlockStart="400">
+        <Box
+          borderBlockStartWidth="025"
+          borderColor="border"
+          paddingBlockStart="400"
+        >
           <InlineStack gap="300" align="end">
             <Button onClick={onCancel} disabled={busy}>
               Cancel

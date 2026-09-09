@@ -9,6 +9,7 @@ import {
   Text,
 } from "@shopify/polaris";
 import SettingToggle from "../ui/SettingToggle";
+import HelpTooltip from "../ui/HelpTooltip";
 
 /**
  * Go-live card (spec 007, plan Task 6) — the single source of truth for test
@@ -66,16 +67,19 @@ export default function GoLiveCard({
     <Card>
       <BlockStack gap="400">
         <InlineStack align="space-between">
-          <Text as="h2" variant="headingMd">
-            Go live
-          </Text>
+          <InlineStack gap="200" blockAlign="center">
+            <Text as="h2" variant="headingMd">
+              Go Live
+            </Text>
+            <HelpTooltip content="Going live registers a ShipMath carrier service with Shopify, so checkout starts asking ShipMath for shipping rates." />
+          </InlineStack>
           <Badge tone={live ? "success" : testMode ? "attention" : "info"}>
             {live ? "Live (carrier rates on)" : testMode ? "Test mode" : "Not live yet"}
           </Badge>
         </InlineStack>
 
         {scopeError ? (
-          <Banner tone="warning" title="Cannot reach the Shopify shipping API">
+          <Banner tone="warning" title="Cannot Reach the Shopify Shipping API">
             <Text as="p" variant="bodySm">
               The app&apos;s access token predates the shipping scopes. Log out and back in
               (or reinstall the app) to grant them, then manage carrier services here.
@@ -84,7 +88,7 @@ export default function GoLiveCard({
         ) : null}
 
         {remotelyDeleted ? (
-          <Banner tone="warning" title="Carrier service was deleted in Shopify admin">
+          <Banner tone="warning" title="Carrier Service Was Deleted in Shopify Admin">
             <Text as="p" variant="bodySm">
               ShipMath still expects a carrier service, but Shopify no longer has it.
               Press &quot;Go live&quot; again to recreate it. Rates are not served until then.
@@ -94,9 +98,9 @@ export default function GoLiveCard({
 
         <List>
           <List.Item>
-            Status: {live ? "registered: ShipMath answers checkout rate calls" : "not registered: checkout uses your theme rates only"}
+            Status: {live ? "Registered. ShipMath answers rate requests at checkout." : "Not registered. Checkout uses your store's own rates only."}
           </List.Item>
-          <List.Item>Test mode: {testMode ? "ON: no carrier rates are served" : "off"}</List.Item>
+          <List.Item>Test mode: {testMode ? "On (no carrier rates are served)" : "Off"}</List.Item>
           <List.Item>
             Registration: {registeredId ?? "—"}{carrierName ? ` (${carrierName}${active === false ? ", inactive" : ""})` : ""}
           </List.Item>

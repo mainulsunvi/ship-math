@@ -357,7 +357,7 @@ export default function ZonesPage() {
         </Text>
       ) : (
         <Text key="usage" as="span" variant="bodySm">
-          {zone.usageCount} rule(s)
+          {zone.usageCount} {zone.usageCount === 1 ? "rule" : "rules"}
         </Text>
       ),
       <ButtonGroup key="actions">
@@ -405,7 +405,7 @@ export default function ZonesPage() {
             {syncFailure ? (
               <Banner
                 tone="critical"
-                title="Checkout mirror out of date"
+                title="Checkout Mirror Out of Date"
                 action={{ content: "Retry sync", onAction: retrySync }}
               >
                 <Text as="p" variant="bodySm">
@@ -420,7 +420,10 @@ export default function ZonesPage() {
               <BlockStack gap="400">
                 <InlineStack align="space-between" blockAlign="center">
                   <Text as="span" variant="bodySm" tone="subdued">
-                    {loaderData.zones.length} zone(s) · newest first
+                    {loaderData.zones.length === 1
+                      ? "1 zone"
+                      : `${loaderData.zones.length} zones`}{" "}
+                    · newest first
                   </Text>
                 </InlineStack>
                 {loaderData.zones.length === 0 ? (
@@ -436,7 +439,7 @@ export default function ZonesPage() {
                 ) : (
                   <DataTable
                     columnContentTypes={["text", "text", "text", "numeric", "text", "text"]}
-                    headings={["Zone", "Destinations", "Enabled", "Postal rules", "Used by", "Actions"]}
+                    headings={["Zone", "Destinations", "Enabled", "Postal Rules", "Used By", "Actions"]}
                     rows={rows}
                     verticalAlign="middle"
                     increasedTableDensity
@@ -458,7 +461,7 @@ export default function ZonesPage() {
           onClose={function closeDelete() {
             setDeleteTarget(null);
           }}
-          title="Delete zone?"
+          title="Delete Zone?"
           primaryAction={{ content: "Delete zone", destructive: true, onAction: confirmDelete, loading: busy }}
           secondaryActions={[
             {

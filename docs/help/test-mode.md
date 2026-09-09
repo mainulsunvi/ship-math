@@ -5,7 +5,7 @@ ShipMath has two settings that change **how** your rules behave:
 - **Test mode** keeps your rules away from real checkouts while you build.
 - **Evaluation mode** decides how many rules will apply to a single order.
 
-There is one test mode switch, and you will find it in Settings, inside the **Go live** card. The Dashboard will only show whether test mode is on or off; to change it, you will go to Settings.
+There is one test mode switch, and you will find it in Settings, inside the **Go Live** card. The Dashboard will only show whether test mode is on or off; to change it, you will go to Settings.
 
 [Add Settings Page Screenshot]
 

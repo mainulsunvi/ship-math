@@ -64,15 +64,15 @@ export default function SyncReportWarnings({ sync }: SyncReportWarningsProps) {
       {tagKinds.length > 0 && dismissed !== tagsSignature ? (
         <Banner
           tone="warning"
-          title="Tag list exceeded the 100-tag input limit"
+          title="Tag List Exceeded the 100-Tag Input Limit"
           onDismiss={function dismissTags() {
             setDismissed(tagsSignature);
           }}
         >
           <Text as="p" variant="bodySm">
             The sync succeeded, but the {tagKinds.join(" and ")} tag list sent to checkout was
-            truncated at 100 tags. Tag conditions may not match at checkout for the dropped tags —
-            reduce the number of distinct tags used in rules, or split large rules into smaller
+            truncated at 100 tags. Tag conditions may not match at checkout for the dropped tags.
+            Reduce the number of distinct tags used in rules, or split large rules into smaller
             ones.
           </Text>
         </Banner>
@@ -80,7 +80,7 @@ export default function SyncReportWarnings({ sync }: SyncReportWarningsProps) {
       {reasons.length > 0 && dismissed !== excludedSignature ? (
         <Banner
           tone="warning"
-          title={`${sync.excluded.length} ${sync.excluded.length === 1 ? "rule" : "rules"} excluded from the checkout mirror`}
+          title={`${sync.excluded.length} ${sync.excluded.length === 1 ? "Rule" : "Rules"} Excluded From the Checkout Mirror`}
           onDismiss={function dismissExclusions() {
             setDismissed(excludedSignature);
           }}

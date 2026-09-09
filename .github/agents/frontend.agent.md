@@ -30,6 +30,7 @@ component in `app/components/` — reuse before creating. Check
 - Prefer **modals** over custom routes for flows and forms (rule editor, zone editor, simulator, AI assistant, wizard steps) per `docs/INSTRUCTION.md`.
 - All form submissions via `useFetcher` against Remix form actions.
 - One component per concern; duplicated markup is a bug — extract to `app/components/ui/`.
+- UX writing per `docs/INSTRUCTION.md` (user directive 2026-09-09), all binding: Title Case headings (page titles, card/section headings, modal titles, table column headers); sentence-case buttons, field labels, and body text; **no em-dashes or en-dashes in any UI string** (period, colon, semicolon, or parentheses instead; the lone "—" empty-value placeholder is the only exception); help text via short `helpText` plus the shared `app/components/ui/HelpTooltip.tsx` (Polaris Tooltip + info icon) for longer explanations; friendly labels instead of raw enum values; proper pluralization ("1 rule", "2 rules", never "rule(s)"); every sentence starts with a capital letter.
 
 ## Output contract
 

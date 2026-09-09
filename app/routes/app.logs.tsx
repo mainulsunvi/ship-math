@@ -192,7 +192,7 @@ function DestinationLine({ input }: { input: LogInput | null }) {
     parts.push(`qty ${input.quantity}`);
   }
   if (input.lineCount !== undefined) {
-    parts.push(`${input.lineCount} line(s)`);
+    parts.push(`${input.lineCount} ${input.lineCount === 1 ? "line" : "lines"}`);
   }
   if (input.loggedIn !== undefined) {
     parts.push(input.loggedIn ? "logged in" : "guest");
@@ -227,7 +227,8 @@ function LogRow({
             {formatStamp(log.createdAt)}
           </Text>
           <Text as="span" variant="bodySm" tone="subdued">
-            {log.rates.length} rate(s) · {log.latencyMs ?? "?"} ms
+            {log.rates.length === 1 ? "1 rate" : `${log.rates.length} rates`} ·{" "}
+            {log.latencyMs ?? "?"} ms
           </Text>
         </InlineStack>
         <Button
@@ -248,7 +249,7 @@ function LogRow({
           <DestinationLine input={log.input} />
           <BlockStack gap="100">
             <Text as="h4" variant="headingXs">
-              Rules evaluated ({log.matched.length})
+              Rules Evaluated ({log.matched.length})
             </Text>
             {log.matched.length === 0 ? (
               <Text as="p" variant="bodySm" tone="subdued">
@@ -278,7 +279,7 @@ function LogRow({
                     {bits.length > 0 ? (
                       <Text as="span" tone="subdued" variant="bodySm">
                         {" "}
-                        — {bits.join(", ")}
+                        · {bits.join(", ")}
                       </Text>
                     ) : null}
                   </Text>
@@ -330,7 +331,7 @@ export default function LogsPage() {
 
   return (
     <ShipMathPage
-      title="Request log"
+      title="Request Log"
       subtitle="Every live carrier callback and simulation, newest first"
       primaryAction={{
         content: "Simulate rates",
@@ -355,7 +356,8 @@ export default function LogsPage() {
                     />
                   </div>
                   <Text as="span" variant="bodySm" tone="subdued">
-                    {loaderData.total} run(s) · kept for 30 days
+                    {loaderData.total === 1 ? "1 run" : `${loaderData.total} runs`}{" "}
+                    · kept for 30 days
                   </Text>
                 </InlineStack>
               </InlineStack>

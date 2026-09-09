@@ -28,7 +28,7 @@ export const CARRIER_RATE_FORBIDDEN_FIELDS: ReadonlyArray<ConditionField> = [
 ];
 
 export const CARRIER_CONTEXT_TOOLTIP =
-  "Carrier service rates run without cart context — tags and login state are unavailable";
+  "Carrier rates run without full cart context, so tags and login state are not available";
 
 type FieldInputKind = "number" | "text" | "tags" | "boolean";
 
@@ -234,8 +234,8 @@ export default function ConditionRow({
           label="Value"
           labelHidden
           options={[
-            { label: "true", value: "true" },
-            { label: "false", value: "false" },
+            { label: "Yes", value: "true" },
+            { label: "No", value: "false" },
           ]}
           value={condition.value === true ? "true" : "false"}
           onChange={function setBoolean(next: string) {

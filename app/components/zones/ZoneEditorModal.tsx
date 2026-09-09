@@ -18,7 +18,6 @@ import { formatForDisplay, validatePostalRuleForCountries } from "../../lib/post
 import PostalRuleEditor from "./PostalRuleEditor";
 import SettingToggle from "../ui/SettingToggle";
 import ModalSection from "../ui/ModalSection";
-import Switch from "../ui/Switch";
 
 /**
  * Create AND edit zone modal (spec 004/005 Task 2) — modal, not a route.
@@ -344,7 +343,7 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
     <Modal
       open
       onClose={onClose}
-      title={zone ? `Edit zone — ${zone.name}` : "New zone"}
+      title={zone ? `Edit zone: ${zone.name}` : "New zone"}
       size="large"
       primaryAction={{ content: zone ? "Save changes" : "Create zone", onAction: handleSubmit, loading: busy }}
       secondaryActions={[{ content: "Cancel", onAction: onClose }]}
@@ -352,7 +351,7 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
       <Modal.Section>
         <BlockStack gap="400">
           {displayErrors.length > 0 ? (
-            <Banner tone="critical" title="Fix before saving">
+            <Banner tone="critical" title="Fix Before Saving">
               <BlockStack gap="100">
                 {displayErrors.map(function renderError(message, index) {
                   return (
@@ -381,18 +380,22 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
               onChange={setEnabled}
             />
           </ModalSection>
-          <ModalSection label="Targeting">
+          <ModalSection
+            label="Targeting"
+            help="Decides which destinations the zone covers. Rules linked to this zone only apply inside it."
+          >
             <BlockStack gap="200">
-              <Switch
-                label="Ship to every country (*)"
-                checked={worldwide}
-                onChange={handleWorldwide}
+              <SettingToggle
+                label="Ship to every country (worldwide)"
+                helpText="The zone matches every destination. Country and province pickers are hidden while this is on."
+                enabled={worldwide}
                 disabled={busy}
+                onChange={handleWorldwide}
               />
               {!worldwide ? (
                 <TagPicker
                   label="Countries"
-                  helpText="Common destinations — pick as many as needed."
+                  helpText="Common destinations. Pick as many as you need."
                   options={COUNTRY_OPTIONS}
                   selected={countries}
                   disabled={busy}
@@ -403,19 +406,20 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
             </BlockStack>
             {singleCountry !== null ? (
             <BlockStack gap="200">
-              <Switch
-                label="Any province (*)"
-                checked={provinces[0] === WORLDWIDE}
+              <SettingToggle
+                label="Any province or state"
+                helpText="The zone covers the whole selected country. Turn off to pick individual provinces."
+                enabled={provinces[0] === WORLDWIDE}
+                disabled={busy}
                 onChange={function handleAnyProvince(next: boolean) {
                   setProvinces(next ? [WORLDWIDE] : []);
                 }}
-                disabled={busy}
               />
               {provinces[0] !== WORLDWIDE ? (
                 provinceOptions.length > 0 ? (
                   <TagPicker
                     label="Provinces / states"
-                    helpText="Leave empty (with “Any province” off) to match every province code."
+                    helpText="Leave empty (with “Any province or state” off) to match every province code."
                     options={provinceOptions}
                     selected={provinces}
                     disabled={busy}
@@ -434,7 +438,10 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
             </BlockStack>
           ) : null}
           </ModalSection>
-          <ModalSection label="Postal rules">
+          <ModalSection
+            label="Postal Rules"
+            help="Narrow the zone to specific postal codes with exact, prefix, range, or partial matching."
+          >
             {postalError ? (
               <Text as="span" variant="bodySm" tone="critical">
                 {postalError}
@@ -447,7 +454,7 @@ export default function ZoneEditorModal({ zone, onClose }: ZoneEditorModalProps)
             ) : null}
             {postalRules.length === 0 ? (
               <Text as="span" variant="bodySm" tone="subdued">
-                No postal rules — the zone matches every postal code inside its countries.
+                No postal rules yet. The zone matches every postal code inside its countries.
               </Text>
             ) : null}
             <BlockStack gap="200">
@@ -517,7 +524,7 @@ function FreeFormProvinceInput({ provinces, disabled, onAdd, onRemove }: FreeFor
       <InlineStack gap="200" blockAlign="center">
         <TextField
           label="Province codes"
-          placeholder="e.g. Bavaria code, NRW — comma separated"
+          placeholder="Comma separated codes, e.g. BY, NRW"
           autoComplete="off"
           value={draft}
           onChange={setDraft}

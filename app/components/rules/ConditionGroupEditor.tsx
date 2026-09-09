@@ -187,10 +187,10 @@ export default function ConditionGroupEditor({
         </Text>
         {byteEstimate > RULE_BYTE_WARN_BYTES ? (
           <Tooltip
-            content={`Serialized conditions ≈ ${byteEstimate} bytes. The checkout mirror budget is ~9.5 KB for the whole shop — large condition trees can push a sync over budget.`}
+            content={`The conditions take about ${byteEstimate} bytes. The checkout config budget is about 9.5 KB for the whole shop, so large condition trees can push a sync over the budget.`}
           >
             <Text as="span" variant="bodySm" tone="caution">
-              Large condition set (≈ {byteEstimate} bytes)
+              Large condition set (about {byteEstimate} bytes)
             </Text>
           </Tooltip>
         ) : null}
@@ -204,7 +204,7 @@ export default function ConditionGroupEditor({
       ) : null}
       {group.conditions.length === 0 ? (
         <Text as="span" variant="bodySm" tone="subdued">
-          No conditions yet — an empty group matches every checkout.
+          No conditions yet. An empty group matches every checkout.
         </Text>
       ) : null}
       <BlockStack gap="200">

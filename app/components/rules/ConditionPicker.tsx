@@ -47,14 +47,14 @@ const FIELD_DESCRIPTIONS: Record<ConditionField, string> = {
   sku: "Item SKU values",
   vendor: "Product vendor name",
   customer_tag: "Tags on the customer",
-  logged_in: "Whether customer is signed in",
+  logged_in: "Whether the customer is signed in",
   destination_country: "Shipping destination country",
   destination_province: "Shipping destination province",
   destination_postal: "Shipping destination postal code",
 };
 
 const DESTINATION_NOTE =
-  "Destination targeting is zone-linked — choose a zone in the Basics section instead of adding destination conditions.";
+  "Destination targeting is handled by zones. Choose a zone in the Basics section instead of adding destination conditions.";
 
 /**
  * Scrollable list container. Raw element because Box takes no style prop:

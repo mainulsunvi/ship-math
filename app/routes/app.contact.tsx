@@ -44,7 +44,7 @@ export default function ContactPage() {
                     requiredIndicator
                   />
                   <Button submit variant="primary">
-                    Send Message
+                    Send message
                   </Button>
                 </BlockStack>
               </Form>

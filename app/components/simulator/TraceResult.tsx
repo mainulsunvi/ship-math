@@ -144,7 +144,7 @@ function TraceResult({ result }: TraceResultProps) {
   return (
     <BlockStack gap="400">
       {result.note ? (
-        <Banner tone="warning" title="Function mirror over budget">
+        <Banner tone="warning" title="Checkout Mirror Over Budget">
           <Text as="p" variant="bodySm">
             {result.note} Carrier rates are still a faithful preview; function
             operations need a smaller configuration (sync, then simulate again).
@@ -152,7 +152,7 @@ function TraceResult({ result }: TraceResultProps) {
         </Banner>
       ) : null}
       {result.testMode ? (
-        <Banner tone="info" title="Test mode is ON">
+        <Banner tone="info" title="Test Mode Is On">
           <Text as="p" variant="bodySm">
             This preview shows what the rules WOULD do. Live checkout applies
             no operations while test mode stays on.
@@ -162,13 +162,13 @@ function TraceResult({ result }: TraceResultProps) {
 
       <BlockStack gap="200">
         <Text as="h3" variant="headingSm">
-          Carrier rates returned
+          Carrier Rates Returned
         </Text>
         {result.rates.length === 0 ? (
           <Banner tone="warning">
             <Text as="p" variant="bodySm">
               No rates match this cart and destination
-              {gateNotes.length > 0 ? ` — ${gateNotes.join("; ")}` : "."}
+              {gateNotes.length > 0 ? ` (${gateNotes.join("; ")})` : "."}
             </Text>
           </Banner>
         ) : (
@@ -196,11 +196,11 @@ function TraceResult({ result }: TraceResultProps) {
 
       <BlockStack gap="200">
         <Text as="h3" variant="headingSm">
-          Function operations (what checkout would do)
+          Delivery Option Changes (What Checkout Would Do)
         </Text>
         {result.functionOperations.length === 0 ? (
           <Text as="p" variant="bodySm" tone="subdued">
-            No operations — no function rule wins for this cart.
+            No operations. No rule matched this cart.
           </Text>
         ) : (
           <BlockStack gap="150">
@@ -214,7 +214,7 @@ function TraceResult({ result }: TraceResultProps) {
       <Box paddingBlockStart="200">
         <BlockStack gap="200">
           <Text as="h3" variant="headingSm">
-            Function lane — rule by rule
+            Delivery Option Rules
           </Text>
           {result.traces.length === 0 ? (
             <Text as="p" variant="bodySm" tone="subdued">
@@ -233,7 +233,7 @@ function TraceResult({ result }: TraceResultProps) {
       <Box paddingBlockStart="200">
         <BlockStack gap="200">
           <Text as="h3" variant="headingSm">
-            Carrier lane — rule by rule
+            Carrier Rate Rules
           </Text>
           {result.carrierTraces.length === 0 ? (
             <Text as="p" variant="bodySm" tone="subdued">
@@ -250,8 +250,8 @@ function TraceResult({ result }: TraceResultProps) {
       </Box>
 
       <Text as="p" variant="bodySm" tone="subdued">
-        Function mirror {result.wireBytes.toLocaleString()} bytes · evaluation
-        mode {result.evaluationMode === "ALL_MATCH" ? "all matches apply" : "first match wins"}.
+        Checkout mirror: {result.wireBytes.toLocaleString()} bytes · Evaluation
+        mode: {result.evaluationMode === "ALL_MATCH" ? "all matches apply" : "first match wins"}.
       </Text>
     </BlockStack>
   );

@@ -27,6 +27,17 @@
 - Prefer **modals** over custom routes for UI/UX flows and forms — EXCEPT rules: rule create/edit live on dedicated routes (`/app/rules/new`, `/app/rules/:uid/edit`) with the shared `RuleForm` component, addressed by the rule's public `uid` (user decision 2026-09-07).
 - **Boolean toggles always use the Switch component** (`app/components/ui/Switch.tsx`) — never Checkbox, Polaris SettingToggle, or button-based toggles (user directive 2026-09-06).
 
+## UX Writing (user directive 2026-09-09)
+
+Every merchant-facing UI string follows these binding rules:
+
+1. **Headings use Title Case.** Page titles, card and section headings, modal titles, and table column headers capitalize every major word ("Checkout Function Status", "Stop on Match", "Rate Simulator"). Buttons, field labels, option lists, and body text stay in sentence case ("Save changes", "Rule name").
+2. **Never use em-dashes (—) or en-dashes (–) in UI strings.** This covers headings, banners, badges, tooltips, help text, error messages, flash/audit messages, option labels, and placeholders. Use a period, colon, semicolon, or parentheses instead. The only allowed dash glyph is the lone "—" used as an empty-value placeholder in tables and lists.
+3. **Help text uses the Polaris Tooltip pattern.** Field-level help stays short (one sentence) in the component's `helpText`; anything longer rides the shared info icon + Tooltip component `app/components/ui/HelpTooltip.tsx` next to the heading or row it explains. Never dump multi-sentence explanations into `helpText`.
+4. **No developer jargon in UI strings.** Never show raw enum values (`CARRIER_RATE`, `FIRST_MATCH`, `true`/`false`); use the friendly label maps (`KIND_LABELS`, `EVALUATION_MODE_OPTIONS`, "Yes"/"No"). Write errors and statuses as full sentences a merchant can act on.
+5. **Pluralize counts properly**: "1 rule", "2 rules", "kept for 30 days". Never "rule(s)", "zone(s)", "run(s)".
+6. **Every sentence starts with a capital letter**, including fragments after a "·" separator, and ends with a period.
+
 ## Forms
 - Use the **`useFetcher`** hook for form handling.
 - Use **Form Actions** (Remix/React Router actions) for form submissions.

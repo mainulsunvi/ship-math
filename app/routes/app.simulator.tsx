@@ -30,6 +30,8 @@ import {
   type SimulationResult,
 } from "../lib/simulate";
 import ShipMathPage from "../components/global/ShipMathPage";
+import { KIND_LABELS } from "../components/rules/KindChip";
+import type { RuleKind } from "../lib/config-schema";
 import AddressForm, {
   countryName,
   EMPTY_ADDRESS,
@@ -87,8 +89,8 @@ interface RuleOption {
 /** Guests and synthetic shoppers for testing tag conditions without CRM data. */
 const DUMMY_CUSTOMERS = [
   { id: "guest", label: "Guest (not logged in)" },
-  { id: "vip", label: "VIP Tester — dummy, tagged VIP" },
-  { id: "wholesale", label: "Wholesale Tester — dummy, tagged wholesale" },
+  { id: "vip", label: "VIP tester (sample, tagged VIP)" },
+  { id: "wholesale", label: "Wholesale tester (sample, tagged wholesale)" },
 ] as const;
 
 const DUMMY_TAGS: Record<string, string[]> = {
@@ -700,8 +702,8 @@ export default function SimulatorPage() {
 
   return (
     <ShipMathPage
-      title="Rate simulator"
-      subtitle="Run your rules on a pretend cart — same engine as checkout"
+      title="Rate Simulator"
+      subtitle="Run your rules on a pretend cart (same engine as checkout)"
       primaryAction={{ content: "Run simulation", onAction: run, loading: simBusy }}
     >
       {/* Polaris Layout renders align-items:flex-start, which collapses each
@@ -721,7 +723,7 @@ export default function SimulatorPage() {
         <div style={{ flex: "1 1 30rem", minWidth: 0 }}>
           <BlockStack gap="400">
             {loaderData.testMode ? (
-              <Banner tone="info" title="Test mode is ON">
+              <Banner tone="info" title="Test Mode Is On">
                 <Text as="p" variant="bodySm">
                   The preview is faithful; live checkout applies nothing while
                   test mode stays on.
@@ -729,7 +731,7 @@ export default function SimulatorPage() {
               </Banner>
             ) : null}
             {loaderData.storeRatesError ? (
-              <Banner tone="warning" title="Store shipping methods unavailable">
+              <Banner tone="warning" title="Store Shipping Methods Unavailable">
                 <BlockStack gap="200">
                   <Text as="p" variant="bodySm">
                     {loaderData.storeRatesError}
@@ -748,7 +750,7 @@ export default function SimulatorPage() {
               <Banner tone="critical">{validationError}</Banner>
             ) : null}
             {runError ? (
-              <Banner tone="critical" title="The simulation failed">
+              <Banner tone="critical" title="The Simulation Failed">
                 {runError}
               </Banner>
             ) : null}
@@ -931,7 +933,7 @@ export default function SimulatorPage() {
             <Card>
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">
-                  Location and customer
+                  Location and Customer
                 </Text>
                 <Select
                   label="Pickup location"
@@ -947,7 +949,7 @@ export default function SimulatorPage() {
                   }}
                   helpText={
                     loaderData.locations.length === 0
-                      ? "No active locations found — pickup rules cannot be previewed with a location."
+                      ? "No active locations found. Pickup rules cannot be previewed without one."
                       : undefined
                   }
                   disabled={simBusy}
@@ -986,7 +988,7 @@ export default function SimulatorPage() {
                 <Select
                   label="Shopify shipping zone (destination shortcut)"
                   options={[
-                    { label: "None — set the destination manually", value: "" },
+                    { label: "None (set the destination manually)", value: "" },
                     ...loaderData.shippingZones.map(function option(zone) {
                       return { label: zone.name, value: zone.id };
                     }),
@@ -997,7 +999,7 @@ export default function SimulatorPage() {
                   }}
                   helpText={
                     loaderData.shippingZones.length === 0
-                      ? "Shopify shipping zones could not be loaded — the manual form above always works."
+                      ? "Shopify shipping zones could not be loaded. The manual form above always works."
                       : "Picking a zone fills the destination country with the zone's first country."
                   }
                   disabled={simBusy}
@@ -1039,7 +1041,7 @@ export default function SimulatorPage() {
                 </Text>
                 {loaderData.rules.length === 0 ? (
                   <Text as="p" variant="bodySm" tone="subdued">
-                    No rules yet — create rules on the Dashboard first.
+                    No rules yet. Create rules on the Dashboard first.
                   </Text>
                 ) : (
                   <BlockStack gap="150">
@@ -1048,7 +1050,7 @@ export default function SimulatorPage() {
                         <Checkbox
                           key={rule.id}
                           label={`${rule.priority}. ${rule.name}`}
-                          helpText={`${rule.kind}${rule.enabled ? "" : " · disabled (disabled rules never run)"}`}
+                          helpText={`${KIND_LABELS[rule.kind as RuleKind]}${rule.enabled ? "" : " · Disabled (disabled rules never run)"}`}
                           checked={effectiveSelectedRuleIds.includes(rule.id)}
                           onChange={function toggle(checked) {
                             toggleRule(rule.id, checked);
@@ -1070,7 +1072,7 @@ export default function SimulatorPage() {
               <Card>
                 <BlockStack gap="300">
                   <Text as="h2" variant="headingMd">
-                    Order summary
+                    Order Summary
                   </Text>
                   <CheckoutSummary
                     lines={lines}
@@ -1092,7 +1094,7 @@ export default function SimulatorPage() {
                 <Card>
                   <BlockStack gap="300">
                     <Text as="h2" variant="headingMd">
-                      Rule trace
+                      Rule Trace
                     </Text>
                     <TraceResult result={result} />
                   </BlockStack>

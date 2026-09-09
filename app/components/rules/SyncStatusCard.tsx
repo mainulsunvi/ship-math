@@ -10,6 +10,7 @@ import {
   ProgressBar,
   Text,
 } from "@shopify/polaris";
+import HelpTooltip from "../ui/HelpTooltip";
 
 /**
  * Checkout Function status card — extracted verbatim from the rules dashboard
@@ -52,7 +53,7 @@ export default function SyncStatusCard({
       <BlockStack gap="400">
         <InlineStack align="space-between">
           <Text as="h2" variant="headingMd">
-            Checkout Function status
+            Checkout Function Status
           </Text>
           <Badge tone={ownerId ? "success" : "attention"}>
             {ownerId ? "Owner created" : "No owner yet"}
@@ -66,7 +67,7 @@ export default function SyncStatusCard({
                 {ownerId}
               </Text>
             ) : (
-              "— (created on first sync)"
+              "not created yet (it is created on first sync)"
             )}
           </List.Item>
           <List.Item>Function rules enabled: {ruleCount}</List.Item>
@@ -75,9 +76,12 @@ export default function SyncStatusCard({
           <List.Item>Health: {budgetPct > 90 ? "Critical" : "Good"}</List.Item>
         </List>
         <Box paddingBlockStart="200">
-          <Text as="p" variant="bodySm">
-            Config budget: {bytes} / {cap} bytes (checkout Functions can&apos;t read past this)
-          </Text>
+          <InlineStack gap="200" blockAlign="center">
+            <Text as="p" variant="bodySm">
+              Config budget: {bytes} / {cap} bytes
+            </Text>
+            <HelpTooltip content="Shopify caps the size of the config the checkout Function can read. Rules that no longer fit are left out of the sync with a warning." />
+          </InlineStack>
           <Box paddingBlockStart="200">
             <ProgressBar progress={budgetPct} tone={budgetPct > 90 ? "critical" : "highlight"} size="small" />
           </Box>
@@ -97,7 +101,7 @@ export default function SyncStatusCard({
         </InlineStack>
         <Text as="p" variant="bodySm" tone="subdued">
           Test mode is {testMode ? "ON (the Function applies no operations)" : "off"} ·{" "}
-          go-live and test mode are managed in Settings.
+          Go-live and test mode are managed in Settings.
         </Text>
       </BlockStack>
     </Card>

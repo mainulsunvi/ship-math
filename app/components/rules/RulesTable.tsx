@@ -106,7 +106,7 @@ export default function RulesTable({
       rule.priority,
       zoneName,
       rule.stopOnMatch ? (
-        <Badge key="stop" tone="info">stops</Badge>
+        <Badge key="stop" tone="info">Stops</Badge>
       ) : (
         <Text key="stop-none" as="span" variant="bodySm" tone="subdued">
           —
@@ -167,7 +167,7 @@ export default function RulesTable({
   return (
     <DataTable
       columnContentTypes={["text", "text", "text", "numeric", "text", "text", "text", "text"]}
-      headings={["Rule", "Kind", "Enabled", "Priority", "Zone", "Stop on match", "Behavior", "Actions"]}
+      headings={["Rule", "Kind", "Enabled", "Priority", "Zone", "Stop on Match", "Behavior", "Actions"]}
       rows={rows}
       verticalAlign="middle"
       increasedTableDensity

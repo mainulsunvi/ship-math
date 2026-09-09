@@ -60,7 +60,7 @@ function parseRuleForm(formData: FormData): { ok: true; input: RuleInput } | { o
   try {
     const result = ConditionGroupSchema.safeParse(JSON.parse(String(formData.get("conditions") ?? "null")));
     if (!result.success) {
-      return { ok: false, message: `Conditions failed validation — ${zodIssuesText(result.error)}` };
+      return { ok: false, message: `Conditions failed validation: ${zodIssuesText(result.error)}` };
     }
     conditions = result.data as RuleInput["conditions"];
   } catch {
@@ -74,7 +74,7 @@ function parseRuleForm(formData: FormData): { ok: true; input: RuleInput } | { o
         ? CarrierRateActionSchema.safeParse(rawAction)
         : ActionSchema.safeParse(rawAction);
     if (!result.success) {
-      return { ok: false, message: `Action failed validation — ${zodIssuesText(result.error)}` };
+      return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
     }
     action = result.data as RuleInput["action"];
   } catch {
@@ -179,7 +179,7 @@ export default function EditRuleRoute() {
 
   return (
     <ShipMathPage
-      title="Edit rule"
+      title="Edit Rule"
       subtitle={loaderData.ruleName}
       backAction={{ content: "Rules", url: "/app" }}
     >
