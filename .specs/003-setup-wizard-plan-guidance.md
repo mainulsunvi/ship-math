@@ -72,7 +72,11 @@ No change beyond 001. `write_shipping` covers the lazy `carrierServiceCreate` pr
 
 ## Standard scenarios
 
-- **Uninstall → reinstall:** wizard reruns on the fresh `Shop` row (by design).
+- **Uninstall → reinstall:** the `Shop` row SURVIVES uninstall (sessions cleared, carrier
+  torn down, zones/rules kept — the documented data-survival behavior), so the wizard does
+  NOT auto-rerun; Settings offers "Restart setup" for a deliberate rerun (amended
+  2026-09-09 per review: original text assumed a fresh `Shop` row, which contradicts spec
+  002 data survival and the shipped uninstall webhook).
 - **Plan downgrade:** handled by `PlanBanner` re-evaluation (criterion 8); downgrade from CCS-eligible to Basic prompts the merchant to re-run setup in Functions mode; carrier service is left registered but the app shows guidance to disable (full auto-teardown deferred to 019).
 - **Partial webhook failure/retry:** `shop/update` handler is an idempotent upsert of plan fields; retries safe.
 - **Large catalog:** wizard never enumerates the catalog; product pickers (if added for preview) must use paginated resource picks — none required for MVP steps.

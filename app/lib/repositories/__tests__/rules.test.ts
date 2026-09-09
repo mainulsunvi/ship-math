@@ -405,3 +405,30 @@ describe("listZones", function () {
     expect(zones.map((zone) => zone.name)).toEqual(["New", "Old"]);
   });
 });
+
+describe("createRule enabled flag (003 wizard drafts)", function () {
+  it("defaults enabled true when the flag is absent (dashboard path)", async function () {
+    const shopId = await createTestShop();
+    const rule = await createRule(shopId, baseRuleInput({ name: "Live rule" }));
+    expect(rule.enabled).toBe(true);
+    expect((await prisma.shippingRule.findUniqueOrThrow({ where: { id: rule.id } })).enabled).toBe(true);
+  });
+
+  it("honors enabled false for wizard draft rules", async function () {
+    const shopId = await createTestShop();
+    const rule = await createRule(shopId, baseRuleInput({ name: "Draft rule", enabled: false }));
+    expect(rule.enabled).toBe(false);
+    expect((await prisma.shippingRule.findUniqueOrThrow({ where: { id: rule.id } })).enabled).toBe(false);
+  });
+
+  it("updateRule never touches enabled — a smuggled enabled:true on a disabled draft is ignored", async function () {
+    const shopId = await createTestShop();
+    const rule = await createRule(shopId, baseRuleInput({ name: "Draft", enabled: false }));
+
+    const updated = await updateRule(shopId, rule.id, baseRuleInput({ name: "Renamed draft", enabled: true }));
+
+    expect(updated.name).toBe("Renamed draft"); // the real change applied
+    expect(updated.enabled).toBe(false); // enable/disable only via setRuleEnabled
+    expect((await prisma.shippingRule.findUniqueOrThrow({ where: { id: rule.id } })).enabled).toBe(false);
+  });
+});

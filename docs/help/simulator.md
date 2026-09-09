@@ -81,7 +81,7 @@ If ShipMath cannot read the store's shipping setup at all, a warning banner at t
 
 ### Delivery customizations, spelled out
 
-Right under the rates, the **Delivery customizations** list will show every change your rules made to the options, one line per change: which option was hidden, renamed (with the old and new name), or moved (with its new position), and which rule did it. If your customization rules ran but the list says they matched no shipping option, the rules' option filters (like "title contains") do not fit any option here — the rule trace will show the same story from the rules' side.
+Right under the rates, the **Delivery customizations** list will show every change your rules made to the options, one line per change: which option was hidden, renamed (with the old and new name), or moved (with its new position), and which rule did it. If your customization rules ran but the list says they matched no shipping option, the rules' option filters (like "title contains") do not fit any option here; the rule trace will show the same story from the rules' side.
 
 If no options appear at all, checkout would show none for that cart and destination: either nothing applies, or a hide rule removed every option.
 

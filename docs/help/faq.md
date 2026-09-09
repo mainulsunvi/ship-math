@@ -28,6 +28,18 @@ Yes. Use the duplicate action in the rules table. The copy will appear right nex
 
 Every rule gets a short unique ID. It is part of the edit page address, so you can bookmark rules you edit often, and you can quote it when asking for help so there is no doubt about which rule you mean.
 
+**Can I run the setup wizard again?**
+
+Yes. Open **Settings**, find the **Setup** card, and press **Restart setup**. You will land on the Dashboard with the wizard open again.
+
+Your running rules keep working while it is open. Only rules that are still switched off (drafts) will turn on when you finish the wizard again, so restarting can never switch a running rule off. See [Getting started](getting-started.md) for a full walkthrough of the steps.
+
+**Why does a banner about my plan appear?**
+
+After you finish setup, ShipMath shows guidance based on your Shopify plan. On entry plans the banner will reassure you that delivery rules work; carrier-calculated rates need a higher plan or annual billing. On plans that support carrier-calculated shipping, it will point you to **Settings** and the **Go live** button.
+
+Press **Dismiss** and it will stay away while your plan stays the same. If your Shopify plan changes later, the banner will come back once with the updated guidance, and it will stay away again after you dismiss it. On plans that support carrier rates, it will also stop appearing once carrier rates are registered.
+
 ## Uninstalling and reinstalling
 
 **What happens if I uninstall ShipMath and install it again later?**

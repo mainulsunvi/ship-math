@@ -30,6 +30,12 @@ const PURE_MODULES: Array<{ file: string; allowed: readonly string[] }> = [
   { file: "carrier/action-schema.ts", allowed: ["zod"] },
   // Zero imports — decimal-string arithmetic shared by the carrier engine.
   { file: "money.ts", allowed: [] },
+  // Zero imports — plan classification (spec 003); shared banner/wizard copy
+  // depends on it staying free of Shopify SDK coupling.
+  { file: "plan.ts", allowed: [] },
+  // Shared zone form parser (spec 003 Task 4): zod + the stored postal-rule
+  // schema + the shared postal validators — all app-side, never WASM-bundled.
+  { file: "zone-form.ts", allowed: ["zod", "./config-schema", "./postal"] },
   // Carrier rate engine (007 §A3): pure sibling modules only — the action
   // schema, money math, rule evaluation, and zone matching.
   {

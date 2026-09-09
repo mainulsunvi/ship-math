@@ -19,11 +19,11 @@ function HelpTooltip({ content }: HelpTooltipProps) {
       <span
         style={{
           display: "inline-flex",
-			alignItems: "center",
-		  justifyContent: "center",
+          alignItems: "center",
+          justifyContent: "center",
           cursor: "help",
-				  color: "var(--p-color-text-secondary)",
-		  paddingTop: "5	px",
+          color: "var(--p-color-text-secondary)",
+          paddingTop: "5px",
         }}
       >
         <Icon source={InfoIcon} />

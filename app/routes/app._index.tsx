@@ -16,13 +16,17 @@ import {
   Link,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
-import type { ShippingRule } from "@prisma/client";
+import type { ShippingRule, Shop } from "@prisma/client";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import prisma, {
   getOrCreateShop,
   countFunctionRules,
   isFunctionSyncStale,
+  appendWizardDraftId,
+  readPrefs,
+  readWizardDraftIds,
+  updatePrefs,
 } from "../db.server";
 import { SOFT_CAP_BYTES } from "../lib/budget";
 import {
@@ -40,11 +44,7 @@ import {
   setEvaluationMode,
   setRuleEnabled,
   swapPriority,
-  updateRule,
 } from "../lib/repositories/rules";
-// CarrierRateActionSchema lives in the carrier module (shared with the function),
-// not in config-schema.
-import { CarrierRateActionSchema } from "../lib/carrier/action-schema";
 import {
   ActionSchema,
   ConditionGroupSchema,
@@ -52,10 +52,16 @@ import {
   type RuleInput,
   type RuleKind,
 } from "../lib/config-schema";
+import { planClassFromShop } from "../lib/plan";
+import { parseZoneForm } from "../lib/zone-form";
+import { parseRuleForm } from "../lib/rule-form";
+import { ensureShopPlanDetails } from "../services/shop-details";
+import { ensureCarrierService, probeCcs } from "../services/carrier-registration";
 import ShipMathPage from "../components/global/ShipMathPage";
 import SyncStatusCard from "../components/rules/SyncStatusCard";
 import RulesTable, { type RuleRow } from "../components/rules/RulesTable";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
+import SetupWizard from "../components/setup/SetupWizard";
 
 /** Mirrors the repository page size used by listRules (spec 005 criterion 7). */
 const RULES_PAGE_SIZE = 50;
@@ -97,8 +103,18 @@ function toRuleRow(rule: ShippingRule): RuleRow {
 }
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { session } = await authenticate.admin(request);
-  const shop = await getOrCreateShop(session.shop);
+  const { admin, session } = await authenticate.admin(request);
+  let shop = await getOrCreateShop(session.shop);
+
+  // First-load plan backfill (spec 003 §3): the shop/update webhook only
+  // fires on changes, so a fresh install backfills plan/name once here before
+  // the wizard classifies the plan. ensureShopPlanDetails never throws;
+  // re-read so classification uses the stored row either way.
+  if (shop.plan === null || shop.name === null) {
+    await ensureShopPlanDetails(admin, session.shop);
+    shop = await getOrCreateShop(session.shop);
+  }
+  const planClass = planClassFromShop(shop);
 
   // Build (without pushing) to show the live byte budget.
   let bytes = 0;
@@ -122,6 +138,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   return json({
     shopDomain: shop.shopDomain,
+    shopName: shop.name,
     testMode: shop.testMode,
     evaluationMode: shop.evaluationMode,
     ownerId: shop.functionOwnerId,
@@ -135,8 +152,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     total,
     page,
     totalPages,
+    planClass,
+    onboardedAt: shop.onboardedAt ? shop.onboardedAt.toISOString() : null,
+    // enabled rides along for the setup wizard's draft labeling (wizard
+    // zones are created disabled); RulesTable only reads id/name.
     zones: zones.map(function toOption(zone) {
-      return { id: zone.id, name: zone.name };
+      return { id: zone.id, name: zone.name, enabled: zone.enabled };
     }),
   });
 }
@@ -154,6 +175,10 @@ interface ActionReply {
   message?: string;
   sync?: MirrorSyncReport;
   fieldErrors?: Record<string, string>;
+  /** Present on wizard-zone-create success (plan 003 Task 4). */
+  zone?: { id: string; name: string };
+  /** Present on wizard-rule-create success (plan 003 Task 4). */
+  rule?: { id: string; name: string };
 }
 
 const EVALUATION_MODES = ["FIRST_MATCH", "ALL_MATCH"] as const;
@@ -168,82 +193,8 @@ function toEvaluationMode(value: string): EvaluationMode | undefined {
   return undefined;
 }
 
-function zodIssuesText(error: z.ZodError): string {
-  return error.issues
-    .map(function describe(issue) {
-      const path = issue.path.length > 0 ? `${issue.path.join(".")}: ` : "";
-      return `${path}${issue.message}`;
-    })
-    .join("; ");
-}
-
-function parseConditionsField(
-  formData: FormData,
-): { ok: true; value: RuleInput["conditions"] } | { ok: false; message: string } {
-  try {
-    const result = ConditionGroupSchema.safeParse(JSON.parse(String(formData.get("conditions") ?? "null")));
-    if (!result.success) {
-      return { ok: false, message: `Conditions failed validation: ${zodIssuesText(result.error)}` };
-    }
-    return { ok: true, value: result.data as RuleInput["conditions"] };
-  } catch {
-    return { ok: false, message: "Conditions are not valid JSON." };
-  }
-}
-
-function parseActionField(
-  kind: RuleKind,
-  formData: FormData,
-): { ok: true; value: RuleInput["action"] } | { ok: false, message: string } {
-  try {
-    const rawAction: unknown = JSON.parse(String(formData.get("action") ?? "null"));
-    const result =
-      kind === "CARRIER_RATE"
-        ? CarrierRateActionSchema.safeParse(rawAction)
-        : ActionSchema.safeParse(rawAction);
-    if (!result.success) {
-      return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
-    }
-    return { ok: true, value: result.data as RuleInput["action"] };
-  } catch {
-    return { ok: false, message: "Action is not valid JSON." };
-  }
-}
-
-type RuleFormParse = { ok: true; input: RuleInput } | { ok: false; message: string };
-
-function parseRuleForm(formData: FormData): RuleFormParse {
-  const name = String(formData.get("name") ?? "").trim();
-  if (name === "") {
-    return { ok: false, message: "Rule name is required." };
-  }
-  const kindResult = RuleKindSchema.safeParse(String(formData.get("kind") ?? ""));
-  if (!kindResult.success) {
-    return { ok: false, message: "Unknown rule kind." };
-  }
-  const priority = Number.parseInt(String(formData.get("priority") ?? ""), 10);
-  if (!Number.isFinite(priority) || priority < 0) {
-    return { ok: false, message: "Priority must be a whole number of 0 or more." };
-  }
-  const conditions = parseConditionsField(formData);
-  if (!conditions.ok) {
-    return conditions;
-  }
-  const action = parseActionField(kindResult.data, formData);
-  if (!action.ok) {
-    return action;
-  }
-  const input: RuleInput = {
-    name,
-    kind: kindResult.data,
-    priority,
-    stopOnMatch: formData.get("stopOnMatch") === "1",
-    zoneId: String(formData.get("zoneId") ?? "").trim() || null,
-    conditions: conditions.value,
-    action: action.value,
-  };
-  return { ok: true, input };
-}
+// Rule-form parsing lives in ../lib/rule-form (shared with the rule routes
+// and the wizard draft intent; extracted per the 005 review).
 
 async function handleSyncIntent(admin: AdminApiClient, shopId: string) {
   const sync = await syncAfterOwnerEnsure(admin, shopId);
@@ -320,44 +271,10 @@ async function handleSeedIntent(admin: AdminApiClient, shop: ShopRef) {
 //   2. ensureFunctionOwner
 //   3. pushFunctionConfig — failures become a sync REPORT, never a throw
 //   4. writeAudit (fail-open)
-
-async function handleRuleCreate(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const parsed = parseRuleForm(formData);
-  if (!parsed.ok) {
-    return json<ActionReply>({ ok: false, message: parsed.message }, { status: 422 });
-  }
-  const rule = await createRule(shopId, parsed.input);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(shopId, "MERCHANT", `Created rule "${rule.name}"`, null, {
-    id: rule.id,
-    name: rule.name,
-    kind: rule.kind,
-    priority: rule.priority,
-  });
-  return json<ActionReply>({ ok: true, sync });
-}
-
-async function handleRuleUpdate(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  const existing = await prisma.shippingRule.findFirst({ where: { id, shopId } });
-  if (!existing) {
-    return json<ActionReply>({ ok: false, message: "Rule not found." }, { status: 404 });
-  }
-  const parsed = parseRuleForm(formData);
-  if (!parsed.ok) {
-    return json<ActionReply>({ ok: false, message: parsed.message }, { status: 422 });
-  }
-  const rule = await updateRule(shopId, id, parsed.input);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(
-    shopId,
-    "MERCHANT",
-    `Updated rule "${rule.name}"`,
-    { id: existing.id, name: existing.name, enabled: existing.enabled, priority: existing.priority, zoneId: existing.zoneId },
-    { id: rule.id, name: rule.name, enabled: rule.enabled, priority: rule.priority, zoneId: rule.zoneId },
-  );
-  return json<ActionReply>({ ok: true, sync });
-}
+//
+// rule-create/rule-update moved to their own routes (005 rules-on-routes);
+// the wizard's draft create lives below. Only rule mutations that stay on
+// the dashboard (delete/duplicate/toggle/priority) keep handlers here.
 
 async function handleRuleDelete(admin: AdminApiClient, shopId: string, formData: FormData) {
   const id = String(formData.get("id") ?? "");
@@ -461,6 +378,150 @@ async function handleSetEvaluationMode(admin: AdminApiClient, shop: ShopRef, for
   return json<ActionReply>({ ok: true, sync });
 }
 
+/** "1 rule" / "2 rules" — merchant-facing counts never use parentheses (UX rules). */
+function countLabel(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * Wizard drafts (plan 003 Task 4): zone/rule steps create rows with
+ * `enabled: false` and NO mirror sync — completion pushes the config once.
+ * The parsed `enabled` form flag is deliberately ignored: enabled is FORCED
+ * false until the `wizard-complete` intent flips the drafts. Every created
+ * id is recorded in prefs (appendWizardDraftId) so completion flips EXACTLY
+ * the wizard's drafts (003 review REQUIRED finding), never rows the merchant
+ * deliberately switched off elsewhere. Read-modify-write is safe here: the
+ * wizard submits one draft at a time.
+ */
+async function handleWizardZoneCreate(shopId: string, formData: FormData) {
+  const parsed = parseZoneForm(formData);
+  if (!parsed.ok) {
+    return json<ActionReply>({ ok: false, fieldErrors: parsed.fieldErrors }, { status: 422 });
+  }
+  const value = parsed.value;
+  const zone = await prisma.zone.create({
+    data: {
+      shopId,
+      name: value.name,
+      enabled: false,
+      countries: JSON.stringify(value.countries),
+      provinces: JSON.stringify(value.provinces),
+      postalRules: JSON.stringify(value.postalRules),
+    },
+  });
+  await appendWizardDraftId(shopId, "wizardDraftZoneIds", zone.id);
+  await writeAudit(shopId, "MERCHANT", `Wizard created zone "${zone.name}" (draft, disabled)`, null, {
+    id: zone.id,
+    name: zone.name,
+    enabled: false,
+  });
+  return json<ActionReply>({ ok: true, zone: { id: zone.id, name: zone.name } });
+}
+
+/**
+ * Wizard rule draft: reuses the dashboard's parseRuleForm verbatim, then
+ * inserts through the repository with enabled: false (createRule accepts the
+ * optional StoredRuleSchema flag; updateRule still never touches enabled).
+ */
+async function handleWizardRuleCreate(shopId: string, formData: FormData) {
+  const parsed = parseRuleForm(formData);
+  if (!parsed.ok) {
+    return json<ActionReply>({ ok: false, message: parsed.message }, { status: 422 });
+  }
+  const rule = await createRule(shopId, { ...parsed.input, enabled: false });
+  await appendWizardDraftId(shopId, "wizardDraftRuleIds", rule.id);
+  await writeAudit(shopId, "MERCHANT", `Wizard created rule "${rule.name}" (draft, disabled)`, null, {
+    id: rule.id,
+    name: rule.name,
+    kind: rule.kind,
+    enabled: false,
+  });
+  return json<ActionReply>({ ok: true, rule: { id: rule.id, name: rule.name } });
+}
+
+/**
+ * Final wizard commit (plan 003 Task 4): flip EXACTLY the wizard's recorded
+ * drafts on (prefs wizardDraftRuleIds/wizardDraftZoneIds — 003 review
+ * REQUIRED finding: a blanket "every disabled row" flip would re-enable
+ * rules the merchant deliberately switched off before a Restart-setup
+ * rerun), stamp onboardedAt, push the mirror once, then optionally register
+ * the carrier service. Order matters: the DB commit and the onboarding stamp
+ * land BEFORE the sync and carrier steps, so a push or registration failure
+ * never reopens the wizard — the dashboard's stale banner + retry covers a
+ * failed sync, and a carrier note covers a failed registration. Draft lists
+ * are cleared in the same pass. FUNCTIONS_ONLY shops are never probed or
+ * registered (spec 003 criterion 2: a probe would create a junk carrier
+ * service).
+ */
+async function handleWizardComplete(admin: AdminApiClient, shop: Shop, formData: FormData) {
+  const wantsCarrier = String(formData.get("carrier") || "") === "1";
+  const planClass = planClassFromShop(shop);
+  const drafts = readWizardDraftIds(readPrefs(shop));
+
+  // Empty id lists flip nothing (updateMany with id in [] matches no rows).
+  const rules = await prisma.shippingRule.updateMany({
+    where: { shopId: shop.id, id: { in: drafts.ruleIds }, enabled: false },
+    data: { enabled: true },
+  });
+  const zones = await prisma.zone.updateMany({
+    where: { shopId: shop.id, id: { in: drafts.zoneIds }, enabled: false },
+    data: { enabled: true },
+  });
+  // null CLEARS the keys (updatePrefs semantics) — a later Restart setup
+  // starts from a clean slate and cannot resurrect stale draft ids.
+  await updatePrefs(shop.id, { wizardDraftRuleIds: null, wizardDraftZoneIds: null });
+
+  await prisma.shop.update({
+    where: { id: shop.id },
+    data: { onboardedAt: new Date() },
+  });
+
+  const enabledLabel = `${countLabel(rules.count, "rule")} and ${countLabel(zones.count, "zone")} enabled`;
+  const sync = await syncAfterOwnerEnsure(admin, shop.id);
+  if (!sync.ok) {
+    // Keep onboardedAt set — the wizard stays closed and the dashboard's
+    // stale banner offers the retry.
+    await writeAudit(shop.id, "MERCHANT", `Setup wizard completed (${enabledLabel}, sync failed)`, null, null);
+    return json<ActionReply>({
+      ok: false,
+      message: `Setup saved ${enabledLabel}, but syncing the checkout Function failed: ${sync.error ?? "unknown error"}. Retry sync from the dashboard.`,
+      sync,
+    });
+  }
+
+  let carrierNote = " Your delivery rules are synced to checkout.";
+  if (wantsCarrier && planClass === "FUNCTIONS_ONLY") {
+    carrierNote = " Carrier rates need a Shopify plan with carrier calculated shipping, so delivery rules will handle checkout.";
+  } else if (wantsCarrier) {
+    const probe = await probeCcs(admin, shop.id);
+    if (probe === "ELIGIBLE") {
+      try {
+        await ensureCarrierService(admin, shop.id);
+        carrierNote = " Carrier rates are set up and synced to checkout.";
+      } catch (error) {
+        carrierNote = ` Carrier rates could not be turned on: ${error instanceof Error ? error.message : String(error)}. Delivery rules still work.`;
+      }
+    } else if (probe === "CCS_OFF") {
+      carrierNote = " Carrier calculated shipping is not available on this store's plan, so delivery rules will handle checkout.";
+    } else {
+      carrierNote = " Carrier rates could not be verified, so delivery rules will handle checkout.";
+    }
+  }
+
+  await writeAudit(
+    shop.id,
+    "MERCHANT",
+    `Setup wizard completed (${enabledLabel}, carrier: ${wantsCarrier ? planClass : "not requested"})`,
+    { onboardedAt: shop.onboardedAt },
+    { onboardedAt: "set", rulesEnabled: rules.count, zonesEnabled: zones.count },
+  );
+  return json<ActionReply>({
+    ok: true,
+    message: `Setup complete. ${countLabel(rules.count, "rule")} and ${countLabel(zones.count, "zone")} enabled.${carrierNote}`,
+    sync,
+  });
+}
+
 export async function action({ request }: ActionFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
   const shop = await getOrCreateShop(session.shop);
@@ -473,12 +534,6 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (intent === "seed") {
       return await handleSeedIntent(admin, shop);
-    }
-    if (intent === "rule-create") {
-      return await handleRuleCreate(admin, shop.id, formData);
-    }
-    if (intent === "rule-update") {
-      return await handleRuleUpdate(admin, shop.id, formData);
     }
     if (intent === "rule-delete") {
       return await handleRuleDelete(admin, shop.id, formData);
@@ -494,6 +549,15 @@ export async function action({ request }: ActionFunctionArgs) {
     }
     if (intent === "set-evaluation-mode") {
       return await handleSetEvaluationMode(admin, shop, formData);
+    }
+    if (intent === "wizard-zone-create") {
+      return await handleWizardZoneCreate(shop.id, formData);
+    }
+    if (intent === "wizard-rule-create") {
+      return await handleWizardRuleCreate(shop.id, formData);
+    }
+    if (intent === "wizard-complete") {
+      return await handleWizardComplete(admin, shop, formData);
     }
     return json<ActionReply>({ ok: false, message: `Unknown intent: ${intent}` }, { status: 400 });
   } catch (error) {
@@ -543,6 +607,22 @@ export default function Index() {
   const navigate = useNavigate();
 
   const [deleteTarget, setDeleteTarget] = useState<RuleRow | null>(null);
+
+  // Local latch, not a loader read: after wizard-complete the revalidation
+  // sets onboardedAt, which would unmount the wizard (and its success
+  // banner) mid-commit. Latching keeps it mounted for this page view only;
+  // a fresh load re-evaluates from the loader (wizard stays closed once
+  // onboarded, reappears after abandonment or Restart setup).
+  const [wizardActive] = useState(function initWizardActive() {
+    return loaderData.onboardedAt === null;
+  });
+  const wizardDraftRules = loaderData.rules
+    .filter(function isDraftRule(rule) {
+      return rule.enabled === false;
+    })
+    .map(function toDraft(rule) {
+      return { id: rule.id, name: rule.name };
+    });
 
   const busy = tableFetcher.state !== "idle" || modeFetcher.state !== "idle";
   const reply = tableFetcher.data as FetcherReply | undefined;
@@ -647,6 +727,15 @@ export default function Index() {
 
         <Layout.Section>
           <BlockStack gap="500">
+            {wizardActive ? (
+              <SetupWizard
+                shopName={loaderData.shopName}
+                planClass={loaderData.planClass}
+                testMode={loaderData.testMode}
+                zones={loaderData.zones}
+                draftRules={wizardDraftRules}
+              />
+            ) : null}
             {reply && reply.ok === false && reply.message ? (
               <Banner tone="critical">{reply.message}</Banner>
             ) : null}

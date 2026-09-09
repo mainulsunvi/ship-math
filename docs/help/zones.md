@@ -26,6 +26,8 @@ A zone is built from three building blocks, and you can use one, two, or all thr
 6. Check the enable switch. A switched-on zone will be active, and a switched-off zone will be skipped.
 7. Save the zone.
 
+The setup wizard uses this same form with one difference: the enable switch is replaced by a note that draft zones turn on when you finish setup, so anything you create there stays off until the wizard's last step.
+
 The zones table will show a **usage count** for each zone, so you will see at a glance how many rules depend on it.
 
 [Add New Zone Form Screenshot]

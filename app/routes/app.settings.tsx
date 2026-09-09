@@ -15,13 +15,13 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
-import { BlockStack, Card, Layout, Text } from "@shopify/polaris";
+import { BlockStack, Button, Card, InlineStack, Layout, Text } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import ShipMathPage from "../components/global/ShipMathPage";
 import GoLiveCard from "../components/settings/GoLiveCard";
-import prisma, { getOrCreateShop } from "../db.server";
+import prisma, { getOrCreateShop, updatePrefs } from "../db.server";
 import { writeAudit } from "../lib/audit";
 import { syncAfterOwnerEnsure } from "../lib/sync";
 import {
@@ -67,6 +67,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     active,
     callbackUrl: carrierCallbackUrl(),
     scopeError,
+    onboarded: shop.onboardedAt !== null,
   });
 }
 
@@ -172,6 +173,24 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
+    if (intent === "restart-setup") {
+      // Plan 003 Task 5: clears the onboarding stamp so the wizard reopens
+      // on the dashboard. Existing zones/rules are untouched — completion
+      // flips only rows recorded as wizard drafts in prefs (003 review),
+      // never rules the merchant deliberately switched off. Stale draft ids
+      // from a previous wizard run are cleared so the rerun starts clean.
+      await prisma.shop.update({ where: { id: shop.id }, data: { onboardedAt: null } });
+      await updatePrefs(shop.id, { wizardDraftRuleIds: null, wizardDraftZoneIds: null });
+      await writeAudit(
+        shop.id,
+        "MERCHANT",
+        "Setup wizard restarted",
+        { onboardedAt: shop.onboardedAt ? shop.onboardedAt.toISOString() : null },
+        { onboardedAt: null },
+      );
+      return redirect("/app");
+    }
+
     return json<ActionReply>({ ok: false, message: `Unknown intent: ${intent}` }, { status: 400 });
   } catch (error) {
     return json<ActionReply>(
@@ -225,6 +244,36 @@ export default function SettingsPage() {
             }}
           />
         </Layout.Section>
+        {loaderData.onboarded ? (
+          <Layout.Section>
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  Setup
+                </Text>
+                <Text as="p" variant="bodyMd">
+                  Run the setup wizard again to review your plan guidance, zones, rate rules, and
+                  carrier rates.
+                </Text>
+                <InlineStack>
+                  <Button
+                    loading={busy}
+                    disabled={busy}
+                    onClick={function restartSetup() {
+                      submit("restart-setup");
+                    }}
+                  >
+                    Restart setup
+                  </Button>
+                </InlineStack>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Your running rules keep working. Only rules that are still disabled (drafts)
+                  turn on when you finish the wizard again.
+                </Text>
+              </BlockStack>
+            </Card>
+          </Layout.Section>
+        ) : null}
         <Layout.Section>
           <Card>
             <BlockStack gap="200">

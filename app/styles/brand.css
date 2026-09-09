@@ -129,3 +129,183 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/*
+ * Setup wizard visual system (2026-09-10 polished-modal redesign): progress
+ * stepper, icon tiles, capability rows, and list rows. Scoped to
+ * .sm-wizard-* so nothing outside the wizard is affected; colors ride the
+ * --sm-accent family plus Polaris color tokens (literal fallbacks supplied)
+ * so dark admin themes keep working.
+ *
+ * Stepper geometry: steps are EQUAL-WIDTH flex columns (flex: 1 1 0) with
+ * each dot centered above its label. Connectors are ::before pseudo-
+ * elements positioned at the dot's vertical center, spanning from the
+ * previous dot's right edge (left: calc(-50% + 13px)) to this dot's left
+ * edge (right: calc(50% + 13px)) — so lines touch both circles exactly,
+ * whatever the label widths are.
+ */
+.sm-wizard-steps {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.sm-wizard-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Connector into this step's dot (skipped for the first). */
+.sm-wizard-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: 12px; /* dot center 13px minus half the 2px line */
+  left: calc(-50% + 13px);
+  right: calc(50% + 13px);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--p-color-border-secondary, #e3e3e3);
+  transition: background 150ms ease-in-out;
+}
+
+/* The walk has passed this step: fill the connector leading into it.
+   :not(:first-child) is repeated so these selectors out-specify the base
+   connector rule above (0,2,0), not just tie it. */
+.sm-wizard-step--done:not(:first-child)::before,
+.sm-wizard-step--current:not(:first-child)::before {
+  background: var(--sm-accent-border);
+}
+
+.sm-wizard-dot {
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  border: 2px solid var(--p-color-border-strong, #8c9196);
+  background: var(--p-color-bg-surface, #ffffff);
+  color: var(--p-color-text-secondary, #616161);
+  transition:
+    background 150ms ease-in-out,
+    border-color 150ms ease-in-out,
+    color 150ms ease-in-out;
+}
+
+/*
+ * Size the Polaris-Icon WRAPPER, never the inner svg: .Polaris-Icon is a
+ * display:block span (1.25rem square) whose svg fills 100% of it, so
+ * shrinking only the svg parks it in the span's top-left corner and the
+ * checkmark renders off-center inside the dot.
+ */
+.sm-wizard-dot .Polaris-Icon {
+  width: 12px;
+  height: 12px;
+}
+
+.sm-wizard-step--done .sm-wizard-dot {
+  background: var(--sm-accent);
+  border-color: var(--sm-accent-strong);
+  color: #ffffff;
+}
+
+.sm-wizard-step--current .sm-wizard-dot {
+  border-color: var(--sm-accent);
+  color: var(--sm-accent-text);
+  box-shadow: 0 0 0 3px var(--sm-accent-subdued);
+}
+
+.sm-wizard-label {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--p-color-text-secondary, #616161);
+}
+
+.sm-wizard-step--current .sm-wizard-label {
+  color: var(--p-color-text, #303030);
+  font-weight: 600;
+}
+
+/* Brand icon tile: step headers (40px) and feature rows (32px). */
+.sm-wizard-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--p-border-radius-200, 8px);
+  background: var(--sm-accent-subdued);
+  color: var(--sm-accent-text);
+}
+
+.sm-wizard-tile--small {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--p-border-radius-150, 6px);
+}
+
+/* Same wrapper-sizing rule as the dot (Polaris span is 1.25rem by default). */
+.sm-wizard-tile--small .Polaris-Icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Included/excluded state icons (plan capabilities, finish checklist). */
+.sm-wizard-ok {
+  display: inline-flex;
+  color: var(--sm-accent-text);
+}
+
+.sm-wizard-no {
+  display: inline-flex;
+  color: var(--p-color-text-secondary, #616161);
+}
+
+/* List rows (zones, draft rules): soft card row with trailing badge. */
+.sm-wizard-row {
+  display: flex;
+  align-items: center;
+  gap: var(--p-space-200, 8px);
+  padding: var(--p-space-200, 8px) var(--p-space-300, 12px);
+  border: 1px solid var(--p-color-border-secondary, #e3e3e3);
+  border-radius: var(--p-border-radius-200, 8px);
+  background: var(--p-color-bg-surface-secondary, #fafafa);
+}
+
+.sm-wizard-row__icon {
+  display: inline-flex;
+  color: var(--sm-accent-text);
+}
+
+.sm-wizard-row .Polaris-Badge {
+  margin-left: auto;
+}
+
+/* Empty state (no zones yet): dashed drop-zone look. */
+.sm-wizard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--p-space-300, 12px);
+  padding: var(--p-space-500, 20px);
+  border: 1px dashed var(--p-color-border-strong, #8c9196);
+  border-radius: var(--p-border-radius-300, 12px);
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .sm-wizard-label {
+    display: none;
+  }
+}

@@ -145,3 +145,18 @@ describe("StoredRuleSchema", function () {
     expect(result.success).toBe(false);
   });
 });
+
+describe("StoredRuleSchema enabled flag (003 wizard drafts)", function () {
+  it("omitting the flag stays valid — legacy RuleInput construction sites are unaffected", function () {
+    // NOTE: .default(true).optional() yields undefined for an omitted flag
+    // (optional short-circuits the default); createRule's `parsed.enabled ?? true`
+    // owns the actual default — pinned in repositories/__tests__/rules.test.ts.
+    const parsed = StoredRuleSchema.parse(baseRuleInput());
+    expect(parsed.enabled).not.toBe(false);
+  });
+
+  it("round-trips an explicit enabled false (wizard draft) and true", function () {
+    expect(StoredRuleSchema.parse(baseRuleInput({ enabled: false })).enabled).toBe(false);
+    expect(StoredRuleSchema.parse(baseRuleInput({ enabled: true })).enabled).toBe(true);
+  });
+});

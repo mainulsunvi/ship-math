@@ -8,15 +8,7 @@ import { getOrCreateShop } from "../db.server";
 import { listRules, listZones, createRule } from "../lib/repositories/rules";
 import { syncAfterOwnerEnsure, type MirrorSyncReport } from "../lib/sync";
 import { writeAudit } from "../lib/audit";
-import { CarrierRateActionSchema } from "../lib/carrier/action-schema";
-import {
-  ActionSchema,
-  ConditionGroupSchema,
-  RuleKindSchema,
-  type RuleInput,
-  type RuleKind,
-} from "../lib/config-schema";
-import type { z } from "zod";
+import { parseRuleForm } from "../lib/rule-form";
 import ShipMathPage from "../components/global/ShipMathPage";
 import RuleForm from "../components/rules/RuleForm";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
@@ -36,64 +28,6 @@ interface ActionReply {
 }
 
 const RULES_PAGE_SIZE = 50;
-
-function zodIssuesText(error: z.ZodError): string {
-  return error.issues
-    .map(function describe(issue) {
-      const path = issue.path.length > 0 ? `${issue.path.join(".")}: ` : "";
-      return `${path}${issue.message}`;
-    })
-    .join("; ");
-}
-
-function parseRuleForm(formData: FormData): { ok: true; input: RuleInput } | { ok: false; message: string } {
-  const name = String(formData.get("name") ?? "").trim();
-  if (name === "") {
-    return { ok: false, message: "Rule name is required." };
-  }
-  const kindResult = RuleKindSchema.safeParse(String(formData.get("kind") ?? ""));
-  if (!kindResult.success) {
-    return { ok: false, message: "Unknown rule kind." };
-  }
-  const priority = Number.parseInt(String(formData.get("priority") ?? ""), 10);
-  if (!Number.isFinite(priority) || priority < 0) {
-    return { ok: false, message: "Priority must be a whole number of 0 or more." };
-  }
-  let conditions: RuleInput["conditions"];
-  try {
-    const result = ConditionGroupSchema.safeParse(JSON.parse(String(formData.get("conditions") ?? "null")));
-    if (!result.success) {
-      return { ok: false, message: `Conditions failed validation: ${zodIssuesText(result.error)}` };
-    }
-    conditions = result.data as RuleInput["conditions"];
-  } catch {
-    return { ok: false, message: "Conditions are not valid JSON." };
-  }
-  let action: RuleInput["action"];
-  try {
-    const rawAction: unknown = JSON.parse(String(formData.get("action") ?? "null"));
-    const result =
-      kindResult.data === "CARRIER_RATE"
-        ? CarrierRateActionSchema.safeParse(rawAction)
-        : ActionSchema.safeParse(rawAction);
-    if (!result.success) {
-      return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
-    }
-    action = result.data as RuleInput["action"];
-  } catch {
-    return { ok: false, message: "Action is not valid JSON." };
-  }
-  const input: RuleInput = {
-    name,
-    kind: kindResult.data,
-    priority,
-    stopOnMatch: formData.get("stopOnMatch") === "1",
-    zoneId: String(formData.get("zoneId") ?? "").trim() || null,
-    conditions,
-    action,
-  };
-  return { ok: true, input };
-}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);

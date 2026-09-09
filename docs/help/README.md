@@ -6,7 +6,7 @@ You will not need any technical knowledge. Every guide uses plain English, and y
 
 ## Start here
 
-If you are new, open [Getting started](getting-started.md) first. In about ten minutes, it will walk you through opening the app, creating your first zone, building your first rule, and seeing it live at checkout.
+If you are new, open [Getting started](getting-started.md) first. A setup wizard will open by itself the first time you open the app, and the guide follows it step by step: your first zone, your first rule, and the switch that takes your rules to checkout.
 
 ## Everyday guides
 
@@ -26,12 +26,12 @@ You will find a small menu at the top of every page:
 
 | Page | What you will do there |
 | --- | --- |
-| Dashboard | See all your rules, check sync health, simulate rates, and spot the test mode state |
+| Dashboard | See all your rules, check sync health, and spot the test mode state. The setup wizard opens here on your first visit |
 | Zones | Manage the groups of destinations your rules can target |
 | Rules | Build and edit the rules themselves on their own pages |
 | Simulator | Run your rules against a pretend order and watch the results, rate by rate |
 | Logs | Trace every live checkout call and simulator run, rule by rule |
-| Settings | Turn test mode on or off and control when carrier rates go live |
+| Settings | Turn test mode on or off, control when carrier rates go live, and restart the setup wizard |
 | Contact | Send a message when you are stuck |
 
 ## Two ideas that explain everything

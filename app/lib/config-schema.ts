@@ -119,6 +119,12 @@ export const StoredRuleSchema = z
     priority: z.number().int(),
     stopOnMatch: z.boolean(),
     zoneId: z.string().nullish(), // null clears the zone binding on update
+    // Setup-wizard draft flag (plan 003 Task 4). Input-optional: when
+    // omitted the default fires and the parsed output is true (createRule
+    // may still pass enabled: false explicitly for wizard drafts).
+    // updateRule ignores it — enable/disable still flows through the
+    // dedicated setRuleEnabled repository entry point.
+    enabled: z.boolean().default(true),
     conditions: ConditionGroupSchema,
     action: z.union([CarrierRateActionSchema, ActionSchema]),
   })
@@ -155,7 +161,10 @@ export const StoredRuleSchema = z
       });
     }
   });
-export type RuleInput = z.infer<typeof StoredRuleSchema>;
+// z.input (not z.infer): RuleInput is what CALLERS construct, and the
+// enabled default makes it input-optional (omitted = true on parse) while
+// the parsed output always carries a concrete boolean.
+export type RuleInput = z.input<typeof StoredRuleSchema>;
 
 // ---------------------------------------------------------------------------
 // Wire format (mirror) — mirrors app/lib/rule-evaluation.ts types, plus the

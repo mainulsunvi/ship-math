@@ -107,6 +107,9 @@ export async function createRule(shopId: string, input: RuleInput): Promise<Ship
     kind: parsed.kind,
     priority: parsed.priority,
     stopOnMatch: parsed.stopOnMatch,
+    // Setup-wizard drafts (plan 003 Task 4) insert disabled; every other
+    // caller omits the flag and inserts enabled (RuleInput default).
+    enabled: parsed.enabled ?? true,
     zoneId: parsed.zoneId ?? null,
     conditions: JSON.stringify(parsed.conditions),
     action: JSON.stringify(parsed.action),

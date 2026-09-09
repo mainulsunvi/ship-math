@@ -279,7 +279,7 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
   zone-match, zone-miss — `pnpm --filter delivery-customization test` ✅
 - ✅ `pnpm exec tsc --noEmit` clean
 
-## 003 — Setup wizard — 📐 plan ready (`plans/003-plan.md`; owner bootstrap hooks exist in `ensureFunctionOwner`)
+## 003 — Setup wizard — ✅ (Orchestrator run 2026-09-09, detail below)
 
 ## 004 — Zone & postal targeting — 🔄 (matching engine done + fixture-tested;
 UI editor designed — `plans/004-005-plan.md`)
@@ -456,6 +456,130 @@ UI editor designed — `plans/004-005-plan.md`)
   .Polaris-Page set no overflow (no scroll-container culprit); Polaris
   itself uses position:sticky 13× in its bundle.
 - ✅ Gates: tsc 0 · build clean (UI-only change; 251 tests untouched).
+
+---
+
+## 003 execution — Setup wizard & plan guidance — 2026-09-09
+
+- ✅ Backend (plan Tasks 1–2): `app/lib/plan.ts` (pure classifier FUNCTIONS_ONLY /
+  CCS_ELIGIBLE / ALL via displayName heuristics + dev/Plus flags, unknown-default
+  CCS_ELIGIBLE; PLAN_CLASS_LABELS; planClassFromShop; shouldShowPlanBanner keyed to
+  current class so a plan change reappears the banner) + `app/graphql/shop.ts`
+  SHOP_DETAILS; `webhooks.app.shop-update.tsx` (idempotent plan/name upsert, retry-safe)
+  + toml subscription; `app/services/shop-details.ts` ensureShopPlanDetails (one-time
+  GraphQL backfill, never throws into a loader); db.server gained ShopPrefs/updatePrefs
+  (null CLEARS a key)/readPrefs/saveShopPlanDetails + appendWizardDraftId /
+  readWizardDraftIds; getOrCreateShop now returns the full Shop type.
+- ✅ Route side: `app/lib/zone-form.ts` (parseZoneForm extracted verbatim from the zones
+  route) + StoredRuleSchema optional `enabled` flag (createRule honors; updateRule
+  ignores — RuleInput now z.input so the default is input-optional); app._index gained
+  wizard-zone-create / wizard-rule-create (drafts forced `enabled: false`, ids recorded
+  in prefs, audited, NO sync) + wizard-complete (flips EXACTLY prefs-recorded drafts →
+  onboardedAt → one syncAfterOwnerEnsure push → optional carrier registration gated on
+  planClass ≠ FUNCTIONS_ONLY via probeCcs, CCS_OFF/ERROR = informational note only;
+  commit-before-push ordering: sync failure keeps drafts enabled + onboardedAt set);
+  loader returns shopName/planClass/onboardedAt/zones.enabled + first-load plan backfill.
+- ✅ Frontend: PlanBanner (info tone on FUNCTIONS_ONLY with carrierRegistered-aware
+  downgrade copy; warning on CCS_ELIGIBLE with Shopify CCS help-doc link + Settings Go
+  live pointer; dismissal posts to dedicated action-only route `app.prefs.tsx` — leaf
+  actions 400 on unknown intents so layout-action bubbling was unreliable); SetupWizard
+  modal on the dashboard gated by onboardedAt === null with local latch (success banner
+  survives revalidation): Welcome / Your Plan / Delivery Zones (stacked ZoneEditorModal
+  with new `draft` prop → wizard-zone-create + "Draft zones turn on when you finish
+  setup") / Rate Rules ("Set Up With AI" placeholder card + embedded RuleForm →
+  wizard-rule-create, declining AI never blocks) / Carrier Rates (CCS plans only,
+  SettingToggle+Switch "Register carrier rates" → carrier=1) / Test Mode / Finish Setup
+  (SyncReportWarnings + critical banner on sync failure); Settings gained a Setup card
+  with "Restart setup" (clears onboardedAt + draft lists, redirects to /app).
+- ✅ Tests +41 → **329** root (23 files): plan matrix (existing 25), zone-form 14,
+  shop-update webhook 4 (authenticate.webhook mock pattern lifted), db-prefs (merge
+  semantics, idempotency, corrupt JSON, ensureShopPlanDetails never-throws),
+  wizard-intents 16 (draft semantics, commit-before-push, probe test-doubles incl.
+  Basic-plan NEVER probed, empty-config ≤ byte cap, 55-rule pagination, uninstall
+  cascade), repo enabled-flag + smuggle-pins, purity-guard + plan.ts + zone-form.ts.
+- ✅ Reviewer (2 verdicts, both → APPROVED after fixes):
+  - `003-review.md` — REQUIRED (wizard-complete blanket flip would re-enable
+    deliberately-disabled rows on Restart setup) → FIXED via prefs draft-id scoping +
+    regression test; SHOULDs fixed (CCS doc link, downgrade banner copy, HelpTooltip
+    `paddingTop: "5\t px"` tab-corrupt CSS); spec reinstall scenario amended to match
+    shipped data-survival behavior.
+  - `005-rules-on-routes-review.md` (PENDING from 2026-09-07 rate-limited session) —
+    REQUIRED (`/app/rules` nav link 404: no index route) → FIXED via
+    `app.rules._index.tsx` redirect; SHOULDs fixed (dead rule-create/rule-update intents
+    removed from app._index; parseRuleForm extracted to shared `app/lib/rule-form.ts`,
+    3 copies → 1); ShipMathNav items skipped per user-owned-file directive.
+- ✅ Docs (same run, 8 binding rules): getting-started.md REWRITTEN around the wizard
+  walkthrough (7 steps, drafts-off-until-Finish, Skip for now, Restart setup, plan
+  banner; 10 screenshot placeholders); README index rows; FAQ +2 entries (rerun wizard,
+  plan banner); zones.md draft-mode pointer; simulator.md em-dash fix.
+- ✅ Gates final: `tsc --noEmit` 0 · root vitest 23 files / **329** tests · extension
+  8/8 (first cold-build run flakes on wasm compile; rerun clean — known) ·
+  `pnpm run build` clean.
+- 📊 LOC (uncommitted, per git status): ~2,900 added across 30+ files — production
+  ~1,800 (plan/shop-details/webhook/prefs helpers/wizard intents + SetupWizard 7 steps
+  + PlanBanner + prefs route + rules redirect + rule-form extraction), tests ~800,
+  docs/spec/reviews ~300.
+- ⚠️ Operator notes: GLM provider flaked twice (orchestrator run truncated mid-Task-1 →
+  work continued via direct Backend/Frontend dispatches, then direct implementation for
+  review fixes); nothing committed (user commits manually). `shopify.app.toml` gained the
+  shop/update subscription → dev store may prompt on next `shopify app dev`.
+- ⬜ Manual smoke pending — HUMAN: fresh-install wizard flow (drafts disabled → Finish
+  → enabled + synced), Skip-for-now abandonment (drafts stay disabled, wizard reopens),
+  Restart-setup rerun with a deliberately-disabled rule (MUST stay disabled — the
+  review's REQUIRED regression), plan banner dismiss + plan-change reappear, `/app/rules`
+  nav click lands on dashboard, carrier step absent on Basic dev-store plan.
+
+### 003 addendum — wizard visual redesign (2026-09-10, user: "looks so basic")
+
+- ✅ Direction chosen by user: **polished modal** (keep large modal + auto-open semantics;
+  full-screen takeover and a dedicated /app/setup route were offered and declined).
+- ✅ NEW `WizardProgress.tsx`: numbered-dot stepper with connector lines at the top of
+  the modal (completed = filled accent + check icon, current = accent ring +
+  aria-current="step", upcoming muted; labels hide under 700px via CSS). Fixed modal
+  title "Set Up ShipMath"; step titles moved into step content.
+- ✅ NEW `StepHeader.tsx` (+ shared `FeatureRow`/`StateRow`): brand icon tile (40px/
+  32px accent-subdued) + headingMd title + one-line muted description; every step now
+  opens with the same rhythm.
+- ✅ Steps redesigned (no flow-semantics changes, labels/docs intact): Welcome feature
+  rows (ListBulleted/Delivery/PlayCircle), Plan capability rows (check vs minus:
+  Delivery rules / Carrier rates per class), Zones card rows w/ globe icons + Draft
+  badges + dashed empty state, Rates AI card gained MagicIcon tile + "Coming soon"
+  badge (form open now replaces the cards), Carrier explanation under delivery-icon
+  header + toggle in its own card, TestMode copy in a card, Done summary as
+  StateRow checklist.
+- ✅ Footer: Back + Skip for now / Close without finishing moved to modal
+  secondaryActions (in-content plain button removed).
+- ✅ brand.css +~120 lines of scoped `.sm-wizard-*` styles (stepper, tiles, rows,
+  empty state; Polaris tokens with literal fallbacks for dark-scheme safety).
+- ✅ Docs same run: getting-started.md progress-counter sentence rewritten for the
+  stepper (all step walkthroughs verified still accurate).
+- ✅ Step-consistency pass (user report, same day): every step now follows ONE
+  layout (StepHeader → one Card body → muted footnote outside); Rates' two
+  cards merged into one with a divider; Carrier/TestMode/Plan footnotes moved
+  outside their cards; Welcome/Done card-wrapped.
+- ✅ Inline zone form (user report, same day): zones no longer stack a second
+  modal on the wizard. NEW `app/components/zones/ZoneForm.tsx` = the full
+  form extracted from ZoneEditorModal (RuleForm conventions: parent owns the
+  fetcher, own action row, draft mode hides the enabled toggle);
+  ZoneEditorModal is now a thin wrapper around it (Zones page unchanged in
+  behavior; footer buttons moved into the form body); the wizard's Zones
+  step embeds ZoneForm inline exactly like the Rates step embeds RuleForm
+  (SetupWizard owns zoneFetcher; success collapses the form and the
+  revalidated list shows the Draft row). wizard-zone-create intent unchanged;
+  WizardActionReply gained fieldErrors for the 422 path. getting-started.md
+  zones step updated (form opens in the step; Press Save draft).
+- ✅ Geometry fixes (user report 2026-09-10): (1) completed-dot checkmark sat 4px
+  left/up — root cause `.Polaris-Icon` is a display:block 1.25rem span whose svg
+  fills 100% of it, so sizing the svg alone parks it top-left; fix sizes the
+  WRAPPER (`.sm-wizard-dot .Polaris-Icon {12px}`, same for the 32px tiles). (2)
+  Connectors stopped up to 12px short of wide-label dots (step spans were label-
+  wide, not dot-wide); fix: equal-width flex columns (flex: 1 1 0) + connector as
+  an absolutely positioned ::before spanning dot-edge to dot-edge
+  (left: calc(-50% + 13px) / right: calc(50% + 13px), top: 12px), fill states
+    repeated with :not(:first-child) to out-specify the base rule. Verified by a
+  static DOM harness measured with Playwright: tick offset (0.01, -0.01)px, all
+  connector gaps ≤ 0.02px (old: -4px tick offset, 12.29px gaps).
+- ✅ Gates: tsc 0 · root vitest 23 files / 329 tests · build clean. Extension untouched.
 
 ---
 

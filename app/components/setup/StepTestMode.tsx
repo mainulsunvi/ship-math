@@ -1,0 +1,43 @@
+import { BlockStack, Card, Link, Text } from "@shopify/polaris";
+import { PlayCircleIcon } from "@shopify/polaris-icons";
+import StepHeader from "./StepHeader";
+
+/**
+ * Wizard step 6: test mode reassurance. Fresh installs start with test mode
+ * ON, so the copy explains checkout stays safe, points at the Simulator for
+ * previewing, and at Settings for going live (spec 003, plan Task 4).
+ */
+
+interface StepTestModeProps {
+  testMode: boolean;
+}
+
+function StepTestMode({ testMode }: StepTestModeProps) {
+  return (
+    <BlockStack gap="400">
+      <StepHeader
+        icon={PlayCircleIcon}
+        title="Test Mode"
+        description={
+          testMode
+            ? "Test mode is on, so your live checkout stays safe: nothing you set up here changes what customers see until you go live."
+            : "Test mode is off, so changes can reach checkout once you finish. You can turn it on in Settings first if you prefer to preview."
+        }
+      />
+      <Card>
+        <BlockStack gap="200">
+          <Text as="p" variant="bodyMd">
+            Preview your rules on the <Link url="/app/simulator">Simulator</Link> page, then turn
+            test mode off and press Go live in <Link url="/app/settings">Settings</Link> when you
+            are ready.
+          </Text>
+        </BlockStack>
+      </Card>
+      <Text as="p" variant="bodySm" tone="subdued">
+        Finishing setup does not skip that step for you; going live stays in your hands.
+      </Text>
+    </BlockStack>
+  );
+}
+
+export default StepTestMode;
