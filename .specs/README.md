@@ -57,3 +57,5 @@ Source of truth for features: `docs/FEATURES.md`. Project rules: `docs/INSTRUCTI
 | 017 | analytics-margin-reporting.md | Impressions, selection rate, cost variance |
 | 018 | ai-debugging-assistant.md | Reverse mode: "why this rate?" |
 | 019 | scale-reliability.md | Edge cache, circuit breakers, status page |
+| 020 | rate-visibility-selectors.md | Show-only cheapest/most-expensive/named rates (invert + rank targeting, no CCS needed) |
+| 021 | scenario-rule-builder-ui.md | Card-based scenario builder: name, field tiers, condition/action chips, ELSE branch, NONE combinator |
