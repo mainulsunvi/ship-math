@@ -630,6 +630,8 @@ export default function SimulatorPage() {
         country: address.country,
         ...(address.province.trim() === "" ? { province: null } : { province: address.province.trim() }),
         ...(address.zip.trim() === "" ? { postal: null } : { postal: address.zip.trim() }),
+        // Spec 021 §9: city feeds the City condition (and the carrier lane).
+        ...(address.city.trim() === "" ? { city: null } : { city: address.city.trim() }),
       },
       loggedIn: customerId !== "guest",
       customerTags: tagsToList(customerTags),

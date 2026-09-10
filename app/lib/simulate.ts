@@ -40,6 +40,8 @@ import {
   type RuleTrace,
 } from "./rule-explain";
 import { evaluateRules, type CartFacts, type WireConfig } from "./rule-evaluation";
+import { nowLocalIn } from "./function-config";
+import { readPrefs } from "../db.server";
 import { addDecimals, multiplyDecimals } from "./money";
 import { inputDigestFor, pruneIfDue, pruneRequestLogs } from "./prune-logs";
 
@@ -67,6 +69,8 @@ export const SimInputSchema = z.object({
     country: z.string().trim().length(2),
     province: z.string().trim().max(10).nullable(),
     postal: z.string().trim().max(20).nullable(),
+    /** Spec 021 §9: destination city (city conditions; optional). */
+    city: z.string().trim().max(100).nullish(),
   }),
   loggedIn: z.boolean(),
   customerTags: z.array(z.string().max(100)).max(100),
@@ -115,6 +119,14 @@ export interface SimFunctionOperation {
   titleContains?: string;
   title?: string;
   index?: number;
+  /** Spec 020: rank selector carried to the combined preview (HIDE only). */
+  rank?: "C" | "E";
+  /** Spec 020: invert the match in the combined preview. */
+  invert?: boolean;
+  /** Spec 021: 0 = THEN branch (rule matched), 1 = ELSE branch. */
+  branch?: 0 | 1;
+  /** Spec 021: position of this action inside the branch (application order). */
+  actionIndex?: number;
 }
 
 export interface SimulationResult {
@@ -143,19 +155,29 @@ function upperOrEmpty(value: string): string {
   return value.toUpperCase();
 }
 
-function simFacts(input: SimInput): { facts: CartFacts; subtotal: string; weightGrams: number; quantity: number } {
+function simFacts(input: SimInput, nowLocal: string): {
+  facts: CartFacts;
+  subtotal: string;
+  weightGrams: number;
+  quantity: number;
+  linePrices: number[];
+} {
   let subtotal = "0";
   let weightGrams = 0;
   let quantity = 0;
   const skus: string[] = [];
   const vendors: string[] = [];
   const productTags: string[] = [];
+  const linePrices: number[] = [];
   for (const line of input.lines) {
     const qty = Math.max(1, Math.trunc(line.quantity));
     // Decimal-string math all the way (money never touches floats).
     subtotal = addDecimals(subtotal, multiplyDecimals(line.price, String(qty)));
     weightGrams += Math.max(0, Math.trunc(line.weightGrams)) * qty;
     quantity += qty;
+    // Spec 021 §9: unit price per line — the line price IS the unit price in
+    // the simulator (same 2-decimal money granularity as both lanes).
+    linePrices.push(Number(line.price));
     if (line.sku && !skus.includes(line.sku)) {
       skus.push(line.sku);
     }
@@ -171,6 +193,7 @@ function simFacts(input: SimInput): { facts: CartFacts; subtotal: string; weight
   return {
     facts: {
       subtotal: Number(subtotal), // Function parity: Number(subtotalAmount)
+      total: Number(subtotal), // carrier-lane parity: the sim cart applies no discounts
       quantity,
       weight: weightGrams, // Function parity: grams
       skus,
@@ -178,10 +201,16 @@ function simFacts(input: SimInput): { facts: CartFacts; subtotal: string; weight
       productTags,
       customerTags: input.customerTags,
       loggedIn: input.loggedIn,
+      linePrices,
+      ...(input.destination.city !== undefined && input.destination.city !== null
+        ? { city: input.destination.city }
+        : {}),
+      nowLocal,
     },
     subtotal,
     weightGrams,
     quantity,
+    linePrices,
   };
 }
 
@@ -198,7 +227,7 @@ export async function simulateRun(shopDomain: string, input: SimInput): Promise<
   const startedAt = Date.now();
   const shop = await prisma.shop.findUnique({
     where: { shopDomain },
-    select: { id: true, testMode: true, evaluationMode: true },
+    select: { id: true, testMode: true, evaluationMode: true, prefs: true },
   });
   if (!shop) {
     throw new Error("This shop is not installed. Reinstall the app and try again.");
@@ -210,7 +239,10 @@ export async function simulateRun(shopDomain: string, input: SimInput): Promise<
     province: input.destination.province ? input.destination.province.toUpperCase() : null,
     postal: input.destination.postal ? input.destination.postal.toUpperCase() : null,
   };
-  const { facts, subtotal, weightGrams, quantity } = simFacts(input);
+  // Spec 021 §9.3: the simulator evaluates date/time conditions against the
+  // shop's wall clock (prefs timezone, UTC fallback).
+  const nowLocal = nowLocalIn(readPrefs(shop).ianaTimezone);
+  const { facts, subtotal, weightGrams, quantity, linePrices } = simFacts(input, nowLocal);
   // Combined-rules picker: a non-empty selection scopes BOTH lanes; an empty
   // or absent list means every rule runs.
   const onlyIds =
@@ -270,23 +302,39 @@ export async function simulateRun(shopDomain: string, input: SimInput): Promise<
 
     // Winners: the production decision walk (FIRST_MATCH/stopOnMatch included).
     const decisions = evaluateRules(config, facts, destination);
-    const winnerIds = new Set(decisions.map(function id(decision) {
-      return decision.ruleId;
+    const decisionByRule = new Map(decisions.map(function entry(decision) {
+      return [decision.ruleId, decision] as const;
     }));
     traces = traces.map(function markWinners(trace) {
-      return { ...trace, winner: winnerIds.has(trace.ruleId) };
-    });
-    functionOperations = decisions.map(function toOperation(decision) {
-      const prismaId = prismaIdByWireId.get(decision.ruleId);
+      const decision = decisionByRule.get(trace.ruleId);
       return {
-        ruleId: decision.ruleId,
-        ruleName: prismaId ? nameById.get(prismaId) ?? "" : "",
-        kind: decision.kind === "H" ? "HIDE" : decision.kind === "R" ? "RENAME" : "MOVE",
-        ...(decision.action.m !== undefined ? { methodType: decision.action.m } : {}),
-        ...(decision.action.tc !== undefined ? { titleContains: decision.action.tc } : {}),
-        ...(decision.action.ti !== undefined ? { title: decision.action.ti } : {}),
-        ...(decision.action.ix !== undefined ? { index: decision.action.ix } : {}),
+        ...trace,
+        winner: decision !== undefined,
+        ...(decision !== undefined ? { branch: decision.branch } : {}),
       };
+    });
+    // Spec 021: each decision carries an actions ARRAY (THEN or ELSE branch);
+    // flatten in application order so store-rates applies them exactly as
+    // the Function walks them (a second RENAME overwrites the first).
+    functionOperations = decisions.flatMap(function toOperations(decision) {
+      const prismaId = prismaIdByWireId.get(decision.ruleId);
+      const ruleName = prismaId ? nameById.get(prismaId) ?? "" : "";
+      const kind = decision.kind === "H" ? "HIDE" : decision.kind === "R" ? "RENAME" : "MOVE";
+      return decision.actions.map(function toOperation(action, actionIndex) {
+        return {
+          ruleId: decision.ruleId,
+          ruleName,
+          kind,
+          branch: decision.branch,
+          actionIndex,
+          ...(action.m !== undefined ? { methodType: action.m } : {}),
+          ...(action.tc !== undefined ? { titleContains: action.tc } : {}),
+          ...(action.ti !== undefined ? { title: action.ti } : {}),
+          ...(action.ix !== undefined ? { index: action.ix } : {}),
+          ...(action.rk !== undefined ? { rank: action.rk } : {}),
+          ...(action.iv !== undefined ? { invert: action.iv === 1 } : {}),
+        };
+      });
     });
   } catch (error) {
     if (error instanceof ConfigTooLargeError) {
@@ -348,13 +396,22 @@ export async function simulateRun(shopDomain: string, input: SimInput): Promise<
   }
 
   const cart: CarrierCartContext = {
-    destination,
+    destination: {
+      country: destination.country,
+      province: destination.province,
+      postal: destination.postal,
+      ...(input.destination.city !== undefined && input.destination.city !== null
+        ? { city: input.destination.city }
+        : {}),
+    },
     currency: "USD", // presentation only — the engine computes in shop currency (§A3)
     subtotal,
     weightGrams,
     quantity,
     skus: facts.skus,
     vendors: facts.vendors,
+    linePrices,
+    nowLocal,
   };
   const detailed = computeRatesDetailed(carrierRules, wireZones, cart, evaluationMode);
   const carrierTraces = carrierTracesFromDetailed(carrierRules, detailed, cart).map(function named(trace) {

@@ -16,7 +16,7 @@ import {
   Link,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
-import type { ShippingRule, Shop } from "@prisma/client";
+import type { Shop } from "@prisma/client";
 import { z } from "zod";
 import { authenticate } from "../shopify.server";
 import prisma, {
@@ -37,21 +37,19 @@ import { syncAfterOwnerEnsure, type MirrorSyncReport } from "../lib/sync";
 import { writeAudit } from "../lib/audit";
 import {
   createRule,
-  deleteRule,
-  duplicateRule,
   listRules,
   listZones,
   setEvaluationMode,
-  setRuleEnabled,
-  swapPriority,
 } from "../lib/repositories/rules";
 import {
-  ActionSchema,
-  ConditionGroupSchema,
-  RuleKindSchema,
-  type RuleInput,
-  type RuleKind,
-} from "../lib/config-schema";
+  AdminApiClient,
+  handleRuleDelete,
+  handleRuleDuplicate,
+  handleRulePriority,
+  handleRuleToggle,
+  RULES_PAGE_SIZE,
+  toRuleRow,
+} from "../lib/rule-table-actions";
 import { planClassFromShop } from "../lib/plan";
 import { parseZoneForm } from "../lib/zone-form";
 import { parseRuleForm } from "../lib/rule-form";
@@ -63,44 +61,9 @@ import RulesTable, { type RuleRow } from "../components/rules/RulesTable";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
 import SetupWizard from "../components/setup/SetupWizard";
 
-/** Mirrors the repository page size used by listRules (spec 005 criterion 7). */
-const RULES_PAGE_SIZE = 50;
 /** Soft-cap warning threshold (005 criterion 7); the cap itself is 500. */
 const RULES_CAP_WARN = 400;
 const RULES_SOFT_CAP = 500;
-
-function parseConditionGroup(raw: string): unknown {
-  try {
-    const result = ConditionGroupSchema.safeParse(JSON.parse(raw));
-    return result.success ? result.data : { combinator: "AND", conditions: [] };
-  } catch {
-    return { combinator: "AND", conditions: [] };
-  }
-}
-
-function parseActionJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-}
-
-function toRuleRow(rule: ShippingRule): RuleRow {
-  const kindResult = RuleKindSchema.safeParse(rule.kind);
-  return {
-    id: rule.id,
-    uid: rule.uid ?? undefined,
-    name: rule.name,
-    kind: kindResult.success ? kindResult.data : "HIDE",
-    enabled: rule.enabled,
-    priority: rule.priority,
-    stopOnMatch: rule.stopOnMatch,
-    zoneId: rule.zoneId,
-    conditions: parseConditionGroup(rule.conditions),
-    action: parseActionJson(rule.action),
-  };
-}
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { admin, session } = await authenticate.admin(request);
@@ -162,8 +125,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   });
 }
 
-type AdminApiClient = Parameters<typeof syncAfterOwnerEnsure>[0];
-
 interface ShopRef {
   id: string;
   testMode: boolean;
@@ -194,7 +155,10 @@ function toEvaluationMode(value: string): EvaluationMode | undefined {
 }
 
 // Rule-form parsing lives in ../lib/rule-form (shared with the rule routes
-// and the wizard draft intent; extracted per the 005 review).
+// and the wizard draft intent; extracted per the 005 review). The rule-table
+// mutations (delete/duplicate/toggle/priority) and toRuleRow live in
+// ../lib/rule-table-actions, shared with /app/rules (2026-09-11) so the
+// dashboard and the Rules page can never drift.
 
 async function handleSyncIntent(admin: AdminApiClient, shopId: string) {
   const sync = await syncAfterOwnerEnsure(admin, shopId);
@@ -266,99 +230,11 @@ async function handleSeedIntent(admin: AdminApiClient, shop: ShopRef) {
   });
 }
 
-// The load-bearing order for every rule mutation (architecture §A1):
-//   1. repository call (Prisma, source of truth)
-//   2. ensureFunctionOwner
-//   3. pushFunctionConfig — failures become a sync REPORT, never a throw
-//   4. writeAudit (fail-open)
-//
-// rule-create/rule-update moved to their own routes (005 rules-on-routes);
-// the wizard's draft create lives below. Only rule mutations that stay on
-// the dashboard (delete/duplicate/toggle/priority) keep handlers here.
-
-async function handleRuleDelete(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  const existing = await prisma.shippingRule.findFirst({
-    where: { id, shopId },
-    select: { id: true, name: true, kind: true, priority: true },
-  });
-  if (!existing) {
-    return json<ActionReply>({ ok: false, message: "Rule not found." }, { status: 404 });
-  }
-  await deleteRule(shopId, id);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(shopId, "MERCHANT", `Deleted rule "${existing.name}"`, existing, null);
-  return json<ActionReply>({ ok: true, sync });
-}
-
-async function handleRuleDuplicate(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  const existing = await prisma.shippingRule.findFirst({
-    where: { id, shopId },
-    select: { id: true, name: true },
-  });
-  if (!existing) {
-    return json<ActionReply>({ ok: false, message: "Rule not found." }, { status: 404 });
-  }
-  const copy = await duplicateRule(shopId, id);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(
-    shopId,
-    "MERCHANT",
-    `Duplicated rule "${existing.name}" as "${copy.name}" (disabled, adjacent priority)`,
-    { id: existing.id },
-    { id: copy.id, name: copy.name, enabled: copy.enabled, priority: copy.priority },
-  );
-  return json<ActionReply>({ ok: true, sync });
-}
-
-async function handleRuleToggle(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  const next = formData.get("value") === "1";
-  const existing = await prisma.shippingRule.findFirst({
-    where: { id, shopId },
-    select: { id: true, name: true, enabled: true },
-  });
-  if (!existing) {
-    return json<ActionReply>({ ok: false, message: "Rule not found." }, { status: 404 });
-  }
-  await setRuleEnabled(shopId, id, next);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(
-    shopId,
-    "MERCHANT",
-    `Rule "${existing.name}" ${next ? "enabled" : "disabled"}`,
-    { enabled: existing.enabled },
-    { enabled: next },
-  );
-  return json<ActionReply>({ ok: true, sync });
-}
-
-async function handleRulePriority(admin: AdminApiClient, shopId: string, formData: FormData) {
-  const id = String(formData.get("id") ?? "");
-  const dirRaw = String(formData.get("dir") ?? "");
-  if (dirRaw !== "up" && dirRaw !== "down") {
-    return json<ActionReply>({ ok: false, message: "Direction must be up or down." }, { status: 422 });
-  }
-  const dir: "up" | "down" = dirRaw;
-  const existing = await prisma.shippingRule.findFirst({
-    where: { id, shopId },
-    select: { id: true, name: true },
-  });
-  if (!existing) {
-    return json<ActionReply>({ ok: false, message: "Rule not found." }, { status: 404 });
-  }
-  await swapPriority(shopId, id, dir);
-  const sync = await syncAfterOwnerEnsure(admin, shopId);
-  await writeAudit(
-    shopId,
-    "MERCHANT",
-    `Moved rule "${existing.name}" ${dir === "up" ? "up" : "down"}`,
-    { id, dir },
-    null,
-  );
-  return json<ActionReply>({ ok: true, sync });
-}
+// The load-bearing order for every rule mutation (architecture §A1) is
+// documented in ../lib/rule-table-actions, where the four table handlers
+// (delete/duplicate/toggle/priority) now live, shared with /app/rules
+// (2026-09-11). rule-create/rule-update live on their own routes (005
+// rules-on-routes); the wizard's draft create lives below.
 
 async function handleSetEvaluationMode(admin: AdminApiClient, shop: ShopRef, formData: FormData) {
   const modeRaw = String(formData.get("mode") ?? "");

@@ -64,8 +64,8 @@ Click **Create a rule draft** and the rule form will open:
 1. Type a name you will recognize later, like `Hide local pickup`.
 2. Set the priority. Lower numbers run first, so priority 10 will run before priority 20. Leave the suggested number if you are unsure.
 3. Choose a zone from the previous step, or leave the zone empty and the rule will apply everywhere.
-4. Add conditions in the IF section if the rule should apply only to some orders, for example cart total greater than 100. A rule with no conditions will apply to every order.
-5. Pick the action in the THEN section: hide, rename, move, or set your own carrier rate.
+4. Add conditions in the **Conditions** card if the rule should apply only to some orders, for example cart total greater than 100. A rule with no conditions will apply to every order.
+5. Add the action in the **Then** card. The first action decides what the rule does: hide, rename, move, or set your own carrier rate.
 6. Press **Save draft**.
 
 Your rule will join the drafts list on the step. Like zones, draft rules turn on when you finish setup, and skipping this step is fine too: you can create rules later on the Rules page. The full guide is [Shipping rules](rules.md).
@@ -111,7 +111,7 @@ Two things worth knowing at that moment:
 
 ## After the wizard: your Dashboard
 
-With setup finished, the Dashboard becomes home base. The **Checkout Function Status** card at the top shows sync health: when checkout last received your rules, how many rules run, and how much of the checkout budget they use. The **Environment** card shows the test mode state and the evaluation mode setting. The rules table lists every rule with its switch, priority arrows, and edit, duplicate, and delete actions.
+With setup finished, the Dashboard becomes home base. The **Checkout Function Status** card at the top shows sync health: when checkout last received your rules, how many rules run, and how much of the checkout budget they use. The **Environment** card shows the test mode state and the evaluation mode setting. The rules table lists every rule with its switch, priority arrows, and edit, duplicate, and delete actions. You will find the same table on the **Rules** page in the app menu.
 
 Two shortcuts deserve a mention. **Add sample rules** on the status card loads a small starter set you can open, change, or delete, which is handy for seeing finished examples. And **New rule** at the top of the page opens the same rule form you used in the wizard, except a rule saved there turns on and syncs right away instead of waiting as a draft.
 

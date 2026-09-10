@@ -294,7 +294,12 @@ describe("003 criterion 6 — wizard drafts persist disabled, never push the mir
     expect(rule.kind).toBe("HIDE");
     expect(rule.uid).toMatch(/^[0-9a-z]{10}$/);
     expect(JSON.parse(rule.conditions)).toEqual({ combinator: "AND", conditions: [] });
-    expect(JSON.parse(rule.action)).toEqual({ target: { method: "PICK_UP" } });
+    // Spec 021: function-kind actions are stored in the wrapper shape
+    // ({ actions, elseActions }); a legacy single action normalizes into it.
+    expect(JSON.parse(rule.action)).toEqual({
+      actions: [{ target: { method: "PICK_UP" } }],
+      elseActions: [],
+    });
     const audit = await prisma.auditLog.findFirstOrThrow({ where: { shopId } });
     expect(audit.summary).toBe('Wizard created rule "Hide pickup" (draft, disabled)');
     expect(stub.graphql).not.toHaveBeenCalled();

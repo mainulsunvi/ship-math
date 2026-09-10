@@ -284,7 +284,8 @@ Legend: ✅ done · 🔄 partial · ⬜ not started · 📐 designed (plan ready
 ## 004 — Zone & postal targeting — 🔄 (matching engine done + fixture-tested;
 UI editor designed — `plans/004-005-plan.md`)
 
-## 005 — Rule builder UX — 📐 plan ready (seed action + status page shipped)
+## 005 — Rule builder UX — � (scenario builder UI shipped with spec 021,
+2026-09-10, see 021 execution below; Advanced tier fields remain)
 
 ## 007 — Carrier service engine — ✅ (run 2026-09-07, see section above)
 
@@ -587,6 +588,98 @@ UI editor designed — `plans/004-005-plan.md`)
   static DOM harness measured with Playwright: tick offset (0.01, -0.01)px, all
   connector gaps ≤ 0.02px (old: -4px tick offset, 12.29px gaps).
 - ✅ Gates: tsc 0 · root vitest 23 files / 329 tests · build clean. Extension untouched.
+
+---
+
+## 020 execution — Rate visibility selectors — 2026-09-10 (user pulled forward from future/)
+
+- ✅ Implemented DIRECTLY (orchestrator), not via subagents; flagged for a Reviewer pass.
+- ✅ Schema: `OptionTargetSchema` gained `rank` (CHEAPEST | MOST_EXPENSIVE) +
+  `invert`; StoredRuleSchema superRefine: rank is HIDE-only + exclusive with
+  method/titleContains; wire `WireActionSchema` gained `rk` ("C"|"E") + `iv` (0|1).
+- ✅ Shared evaluator (`rule-evaluation.ts`, WASM-bundled): `resolveRankHandles`
+  (fail-closed on unknown cost, first-occurrence tie-break), `optionMatchesTarget`
+  optional 3rd `ranks` param + invert of final verdict, `describeWireActionTarget`
+  merchant-language helper; `DeliveryOptionFacts.cost`.
+- ✅ Function: input query gained `deliveryOptions { cost { amount } }` (types
+  regenerated via `shopify app function typegen`); per-group ranks resolved
+  against the ORIGINAL option list (hidden options can still BE cheapest);
+  the hand-rolled `asRule` parser now carries rk/iv (initially dropped → all
+  fixtures caught it).
+- ✅ Simulator parity: `SimFunctionOperation` carries rank/invert;
+  `buildCheckoutOptions` resolves ranks over the ORIGINAL combined list with a
+  costByCode map (also fixed a latent quirk: preview handles now use option
+  CODES, not titles).
+- ✅ ActionEditor: HIDE gained a Targeting Select (6 modes, friendly labels):
+  Hide matching / Show only matching / Show only cheapest / Show only most
+  expensive / Hide cheapest / Hide most expensive; rank modes hide the
+  method/title filters (mutual exclusion); drafts round-trip all modes.
+- ✅ Tests: NEW rate-visibility.test.ts (11: rank resolution, ties, unknown
+  cost, all selector verdicts, backward compat, descriptions) + 2 parity cases
+  in store-rates.test.ts; extension fixtures +2 (show-only-cheapest,
+  show-only-named) and all 8 legacy fixtures extended with deterministic
+  `cost` objects (fixture validator requires data for every queried field;
+  a PowerShell rewrite initially added BOMs → stripped byte-wise).
+- ✅ **OQ-1 RESOLVED empirically**: the `cost { amount }` field passes the
+  platform's input-query validation in the fixture suite — no cost-cap
+  rejection (was estimated 30/30 exactly; the helper accepts it).
+- ⚠️ Spec deviations (noted, not blocking): criterion 10's merchant-readable
+  selector text is provided by the tested `describeWireActionTarget` helper
+  but not yet rendered in the simulator's customization list (needs
+  CheckoutCustomization to carry the description; small follow-up); no
+  explicit 20-rule budget test added (existing budget suite covers the cap;
+  rk/iv add ~10 bytes/rule).
+- ✅ Docs same run: rules.md Hide section rewritten around the six Targeting
+  modes (+table row, +screenshot placeholder).
+- ✅ Gates final: tsc 0 · root vitest 24 files / **342** tests · build clean ·
+  extension **10/10** fixtures (2 new).
+- ⬜ Manual smoke pending — HUMAN: create a Hide rule per Targeting mode in a
+  dev store, run each through the Simulator (combined preview), then checkout.
+
+---
+
+## 021 execution — Scenario rule builder (conditions catalog, THEN/ELSE, NONE, date and time) — 2026-09-10
+
+- ⚠️ Orchestrator subagent flaked (GLM provider rate limits, documented
+  pattern) → implemented DIRECTLY across two sessions; flagged for a Reviewer
+  pass next session.
+- ✅ Backend lane: config-schema 17 condition fields (new: total, price,
+  city, date, day_of_week, time_of_day), NONE root combinator (validateNoNestedNone),
+  FunctionRuleActionsSchema { actions, elseActions } wrapper (legacy single
+  `a` normalized on read); rule-evaluation WireAction[] branches, RuleDecision
+  { branch }, weekday/date/time_of_day semantics (UI lowercase mon..sun ↔
+  wire Mon..Sun via normalizeWeekday; zero-padded lexicographic compares;
+  total/price/city/date/tod fail-closed when lane provides no facts);
+  carrier lane carries city + linePrices + nowLocal (shop timezone stored on
+  Shop.prefs.ianaTimezone, refreshed during sync via SHOP_TIMEZONE_QUERY).
+- ✅ Input query widened (cost 29/30): cart.cost.totalAmount,
+  lines.cost.subtotalAmount (price = subtotal ÷ quantity per line),
+  deliveryGroups.deliveryAddress.city. typegen re-run.
+- ✅ Clock exclusion: Functions are pure (no clock) → rules using date/dow/tod
+  are excluded from the checkout mirror with an explicit reason; carrier lane
+  and simulator evaluate them against nowLocal in the shop's timezone.
+- ✅ UI lane: ConditionModal (two-step catalog → editor), ActionModal, chips
+  in ConditionGroupEditor with root All/Any/None ChoiceList, RuleForm card
+  flow (Basics / Conditions with Basic+Advanced tier cards / Then / Else /
+  Rate), describeFunctionDraft + describeCarrierDraft summaries, brand.css
+  chip + tier styles; simulator destination city wired.
+- ✅ Tests: NEW rule-evaluation-021.test.ts (**26**: NONE incl. vacuous,
+  ELSE branch semantics, multi-action order, legacy `a` compat, all new
+  fields incl. fail-closed, nowLocalIn fake-timer sanity); extension
+  fixtures: 10 legacy patched (totalAmount/subtotalAmount/city via Node
+  script, no BOM issues) + NEW else-branch.json + multi-action.json → **12/12**.
+  Fixed nowLocalIn: Intl parts read BY TYPE (en-CA keeps the date as one
+  token → index-based split produced `…Tundefined:undefined`).
+- ✅ Docs same run: rules.md rewritten for the scenario builder (field table,
+  date-and-time lane note, none combinator, THEN/ELSE section, tier cards);
+  sync.md warnings gained the date-and-time exclusion bullet; getting-started
+  wizard wording aligned; simulator.md city + shop-timezone sentence.
+- ✅ Gates final: tsc 0 · root vitest 25 files / **368** tests · build clean ·
+  extension **12/12** fixtures.
+- ⬜ Manual smoke pending — HUMAN: build a rule with Date and time conditions
+  in a dev store, confirm the sync warning names it, and confirm carrier
+  checkout still charges the rule's rate while checkout options stay
+  untouched by that rule.
 
 ---
 

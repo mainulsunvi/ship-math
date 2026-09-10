@@ -1,11 +1,11 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { useFetcher, useLoaderData, useNavigate } from "@remix-run/react";
-import { Layout, Text } from "@shopify/polaris";
-import { useEffect } from "react";
+import { Badge, Banner, BlockStack, Card, Layout, Text } from "@shopify/polaris";
+import { useEffect, useState } from "react";
 import { authenticate } from "../shopify.server";
 import { getOrCreateShop } from "../db.server";
-import { getRuleByUid, listZones, updateRule } from "../lib/repositories/rules";
+import { getRuleByUid, listZones, setRuleEnabled, updateRule } from "../lib/repositories/rules";
 import { syncAfterOwnerEnsure, type MirrorSyncReport } from "../lib/sync";
 import { writeAudit } from "../lib/audit";
 import { parseRuleForm } from "../lib/rule-form";
@@ -13,6 +13,7 @@ import { RuleKindSchema } from "../lib/config-schema";
 import ShipMathPage from "../components/global/ShipMathPage";
 import RuleForm, { type RuleFormInitial } from "../components/rules/RuleForm";
 import SyncReportWarnings from "../components/rules/SyncReportWarnings";
+import SettingToggle from "../components/ui/SettingToggle";
 
 /**
  * /app/rules/:uid/edit — dedicated edit route keyed by the rule's public uid
@@ -51,6 +52,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     ruleId: rule.id,
     uid: rule.uid,
     ruleName: rule.name,
+    enabled: rule.enabled,
     initial,
     zones: zones.map(function toOption(zone) {
       return { id: zone.id, name: zone.name };
@@ -68,6 +70,22 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
+
+  if (intent === "rule-toggle") {
+    // Same orchestration as the dashboard's toggle: flip, sync, audit. The
+    // page stays put (no navigation), so unsaved form work survives the flip.
+    const next = formData.get("value") === "1";
+    await setRuleEnabled(shop.id, existing.id, next);
+    const sync = await syncAfterOwnerEnsure(admin, shop.id);
+    await writeAudit(
+      shop.id,
+      "MERCHANT",
+      `Rule "${existing.name}" ${next ? "enabled" : "disabled"}`,
+      { id: existing.id, uid: existing.uid, enabled: existing.enabled },
+      { id: existing.id, uid: existing.uid, enabled: next },
+    );
+    return json<ActionReply>({ ok: true, sync });
+  }
 
   if (intent !== "rule-update") {
     return json<ActionReply>({ ok: false, message: `Unknown intent: ${intent}` }, { status: 400 });
@@ -103,6 +121,44 @@ export default function EditRuleRoute() {
   const busy = fetcher.state !== "idle";
   const reply = fetcher.data as ActionReply | undefined;
 
+  // Status toggle rides its own fetcher so flipping it never submits the
+  // form (unsaved edits stay on screen) and never triggers the navigation.
+  const toggleFetcher = useFetcher<typeof action>();
+  const toggleBusy = toggleFetcher.state !== "idle";
+  const toggleReply = toggleFetcher.data as ActionReply | undefined;
+  const [enabled, setEnabled] = useState(loaderData.enabled);
+
+  // Keep the local switch aligned whenever the loader refetches.
+  useEffect(
+    function syncFromLoader() {
+      setEnabled(loaderData.enabled);
+    },
+    [loaderData.enabled],
+  );
+
+  // Revert the optimistic flip when the toggle fails.
+  useEffect(
+    function revertOnFailure() {
+      if (toggleFetcher.state === "idle" && toggleFetcher.data?.ok === false) {
+        setEnabled(loaderData.enabled);
+      }
+    },
+    [toggleFetcher.state, toggleFetcher.data, loaderData.enabled],
+  );
+
+  const toggleError =
+    !toggleBusy && toggleReply?.ok === false
+      ? (toggleReply.message ?? "Could not change the rule status.")
+      : null;
+
+  // Sync warnings can come from either the save or the status toggle.
+  const syncReport =
+    reply?.sync && reply.sync.ok
+      ? reply.sync
+      : toggleReply?.sync && toggleReply.sync.ok
+        ? toggleReply.sync
+        : undefined;
+
   // Return to the dashboard once the update succeeds.
   useEffect(
     function leaveOnSuccess() {
@@ -118,20 +174,29 @@ export default function EditRuleRoute() {
       title="Edit Rule"
       subtitle={loaderData.ruleName}
       backAction={{ content: "Rules", url: "/app" }}
+      titleMetadata={[
+        <Badge key="status" tone={enabled ? "success" : "attention"}>
+          {enabled ? "Active" : "Inactive"}
+        </Badge>,
+        <Badge key="uid" tone="info">
+          {loaderData.uid ? `#${loaderData.uid}` : ""}
+        </Badge>,
+      ]}
     >
       <Layout>
         <Layout.Section>
-          <Text as="p" variant="bodySm" tone="subdued">
-            ID: {loaderData.uid}
-          </Text>
-          <SyncReportWarnings sync={reply?.sync && reply.sync.ok ? reply.sync : undefined} />
+          <SyncReportWarnings sync={syncReport} />
           <RuleForm
             mode="edit"
             zones={loaderData.zones}
             initial={loaderData.initial}
             submitLabel="Save changes"
             busy={busy}
-            serverError={!busy && reply?.ok === false ? reply.message ?? "Could not save the rule." : null}
+            serverError={
+              !busy && reply?.ok === false
+                ? (reply.message ?? "Could not save the rule.")
+                : null
+            }
             onSubmit={function submit(input) {
               fetcher.submit(
                 {
@@ -151,6 +216,32 @@ export default function EditRuleRoute() {
               navigate("/app");
             }}
           />
+        </Layout.Section>
+        <Layout.Section variant="oneThird">
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingSm">
+                Rule Status
+              </Text>
+              <SettingToggle
+                label="Active"
+                helpText="An inactive rule keeps its setup but never runs at checkout."
+                enabled={enabled}
+                disabled={toggleBusy}
+                onChange={function toggleStatus(next: boolean) {
+                  setEnabled(next);
+                  toggleFetcher.submit(
+                    { intent: "rule-toggle", value: next ? "1" : "0" },
+                    { method: "post" },
+                  );
+                }}
+              />
+              {toggleError ? <Banner tone="critical">{toggleError}</Banner> : null}
+              <Text as="p" variant="bodySm" tone="subdued">
+                ID: {loaderData.uid}
+              </Text>
+            </BlockStack>
+          </Card>
         </Layout.Section>
       </Layout>
     </ShipMathPage>

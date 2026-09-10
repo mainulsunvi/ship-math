@@ -43,7 +43,7 @@ The simulator needs at least one line with a title and a valid price before it w
 
 The **Destination** card is a full address form, like the one a customer fills in at checkout: name, street address, city, country, province or state, postal code, and phone. Pick a country from the list and the form will adjust: the United States and Canada will show a province dropdown, other countries will accept a free-text region.
 
-Two of these fields drive most rules: **country** (zones match on it) and **postal code** (postal code conditions match on it). If you are testing a rule that targets a postal code range, type a code inside the range.
+Two of these fields drive most rules: **country** (zones match on it) and **postal code** (postal code conditions match on it). If you are testing a rule that targets a postal code range, type a code inside the range. Rules with a city condition match on the **city** field, and date and time conditions compare against the current moment in your shop's time zone setting, so a rule like "free delivery on Fridays" will show the same answer here as in the carrier lane.
 
 ## Step 3: Choose location and customer
 
@@ -62,7 +62,7 @@ By default the simulator will run every rule, exactly as checkout would. The **R
 
 - Click **All** or **None** to select the list in one click.
 - Tick individual rules to run just those. This is the fastest way to debug one rule in isolation.
-- Rules that are switched off on the Dashboard will appear unticked and cannot be selected, because checkout will not run them either.
+- Rules that are switched off on the Rules page will appear unticked and cannot be selected, because checkout will not run them either.
 
 ## The order summary
 

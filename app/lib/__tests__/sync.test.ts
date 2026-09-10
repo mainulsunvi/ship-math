@@ -30,12 +30,17 @@ const prismaStub = vi.hoisted(function createPrismaStub() {
   };
 });
 
+/** function-config's timezone pre-step writes prefs through updatePrefs. */
+const updatePrefsStub = vi.hoisted(function createUpdatePrefsStub() {
+  return vi.fn();
+});
+
 vi.mock("../../shopify.server", function mockShopifyServer() {
   return { authenticate: { admin: vi.fn() } };
 });
 
 vi.mock("../../db.server", function mockDbServer() {
-  return { default: prismaStub };
+  return { default: prismaStub, updatePrefs: updatePrefsStub };
 });
 
 const SHOP_ID = "shop_sync-test";
@@ -98,6 +103,7 @@ beforeEach(function resetStubs() {
   vi.clearAllMocks();
   prismaStub.shop.findUniqueOrThrow.mockResolvedValue(createShopRow());
   prismaStub.shop.update.mockResolvedValue({});
+  updatePrefsStub.mockResolvedValue({});
 });
 
 describe("syncMirror", function () {
@@ -124,7 +130,14 @@ describe("syncMirror", function () {
     prismaStub.shop.findUniqueOrThrow.mockResolvedValue(shopRow);
 
     const admin = createStubAdmin();
-    admin.graphql.mockResolvedValue(metafieldsSetResponse());
+    // Spec 021: pushFunctionConfig first reads the shop's IANA timezone for
+    // date/time conditions, THEN writes the metafields — program both.
+    admin.graphql.mockImplementation(async function program(query: string) {
+      if (query.includes("ianaTimezone")) {
+        return { json: async () => ({ data: { shop: { ianaTimezone: "UTC" } } }) };
+      }
+      return metafieldsSetResponse();
+    });
 
     const report = await syncMirror(admin as unknown as SyncAdminClient, SHOP_ID);
 
@@ -137,10 +150,14 @@ describe("syncMirror", function () {
       { ruleId: "rule-1", reason: "uses destination/collection conditions not supported by the Function lane" },
     ]);
     expect(report.variablesTruncated).toEqual({ pt: false, ct: false });
-    // The push actually happened: metafieldsSet fired and the shop row got stamped.
-    expect(admin.graphql).toHaveBeenCalledTimes(1);
-    expect(admin.graphql.mock.calls[0][0]).toBe(SET_FUNCTION_METAFIELDS);
-    const call = admin.graphql.mock.calls[0] as unknown as [
+    // The push actually happened: the timezone pre-step + metafieldsSet fired
+    // (in that order), the prefs row stored the timezone, and the shop row got
+    // stamped.
+    expect(admin.graphql).toHaveBeenCalledTimes(2);
+    expect(admin.graphql.mock.calls[0][0]).toContain("ianaTimezone");
+    expect(updatePrefsStub).toHaveBeenCalledWith(SHOP_ID, { ianaTimezone: "UTC" });
+    expect(admin.graphql.mock.calls[1][0]).toBe(SET_FUNCTION_METAFIELDS);
+    const call = admin.graphql.mock.calls[1] as unknown as [
       string,
       { variables: { metafields: Array<{ key: string; value: string }> } },
     ];

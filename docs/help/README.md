@@ -28,7 +28,7 @@ You will find a small menu at the top of every page:
 | --- | --- |
 | Dashboard | See all your rules, check sync health, and spot the test mode state. The setup wizard opens here on your first visit |
 | Zones | Manage the groups of destinations your rules can target |
-| Rules | Build and edit the rules themselves on their own pages |
+| Rules | Create, switch on or off, and reorder the rules that change delivery options at checkout |
 | Simulator | Run your rules against a pretend order and watch the results, rate by rate |
 | Logs | Trace every live checkout call and simulator run, rule by rule |
 | Settings | Turn test mode on or off, control when carrier rates go live, and restart the setup wizard |

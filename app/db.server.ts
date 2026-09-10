@@ -60,6 +60,8 @@ export interface ShopPrefs {
   checklistDismissedAt?: string | null;
   wizardDraftRuleIds?: string[] | null;
   wizardDraftZoneIds?: string[] | null;
+  /** Spec 021 §9.3: shop IANA timezone for date/time conditions ("" = UTC fallback). */
+  ianaTimezone?: string | null;
   [key: string]: unknown;
 }
 

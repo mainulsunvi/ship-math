@@ -4,15 +4,44 @@
     "target": "cart.delivery-options.transform.run",
     "input": {
       "cart": {
-        "cost": { "subtotalAmount": { "amount": "150.00" } },
-        "buyerIdentity": { "isAuthenticated": false, "customer": null },
+        "cost": {
+          "subtotalAmount": {
+            "amount": "150.00"
+          },
+          "totalAmount": {
+            "amount": "150.00"
+          }
+        },
+        "buyerIdentity": {
+          "isAuthenticated": false,
+          "customer": null
+        },
         "lines": [],
         "deliveryGroups": [
           {
-            "deliveryAddress": { "countryCode": "US", "provinceCode": "NY", "zip": "10001" },
+            "deliveryAddress": {
+              "countryCode": "US",
+              "provinceCode": "NY",
+              "zip": "10001",
+              "city": "San Francisco"
+            },
             "deliveryOptions": [
-              { "handle": "standard", "title": "Standard Shipping", "deliveryMethodType": "SHIPPING" },
-              { "handle": "pickup", "title": "Store Pickup", "deliveryMethodType": "PICK_UP" }
+              {
+                "handle": "standard",
+                "title": "Standard Shipping",
+                "deliveryMethodType": "SHIPPING",
+                "cost": {
+                  "amount": "8.00"
+                }
+              },
+              {
+                "handle": "pickup",
+                "title": "Store Pickup",
+                "deliveryMethodType": "PICK_UP",
+                "cost": {
+                  "amount": "0.00"
+                }
+              }
             ]
           }
         ]
@@ -23,7 +52,20 @@
             "v": 1,
             "t": 0,
             "m": "F",
-            "z": [{ "i": "z1", "c": ["US"], "pc": [{ "m": "P", "x": "94" }] }],
+            "z": [
+              {
+                "i": "z1",
+                "c": [
+                  "US"
+                ],
+                "pc": [
+                  {
+                    "m": "P",
+                    "x": "94"
+                  }
+                ]
+              }
+            ],
             "r": [
               {
                 "i": "r1",
@@ -31,7 +73,9 @@
                 "p": 10,
                 "s": 0,
                 "z": "z1",
-                "a": { "m": "PICK_UP" }
+                "a": {
+                  "m": "PICK_UP"
+                }
               }
             ]
           }
@@ -39,6 +83,8 @@
         "c1": null
       }
     },
-    "output": { "operations": [] }
+    "output": {
+      "operations": []
+    }
   }
 }

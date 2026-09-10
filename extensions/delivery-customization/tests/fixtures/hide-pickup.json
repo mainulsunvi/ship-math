@@ -4,15 +4,44 @@
     "target": "cart.delivery-options.transform.run",
     "input": {
       "cart": {
-        "cost": { "subtotalAmount": { "amount": "150.00" } },
-        "buyerIdentity": { "isAuthenticated": false, "customer": null },
+        "cost": {
+          "subtotalAmount": {
+            "amount": "150.00"
+          },
+          "totalAmount": {
+            "amount": "150.00"
+          }
+        },
+        "buyerIdentity": {
+          "isAuthenticated": false,
+          "customer": null
+        },
         "lines": [],
         "deliveryGroups": [
           {
-            "deliveryAddress": { "countryCode": "US", "provinceCode": "CA", "zip": "94105" },
+            "deliveryAddress": {
+              "countryCode": "US",
+              "provinceCode": "CA",
+              "zip": "94105",
+              "city": "San Francisco"
+            },
             "deliveryOptions": [
-              { "handle": "standard", "title": "Standard Shipping", "deliveryMethodType": "SHIPPING" },
-              { "handle": "pickup", "title": "Store Pickup", "deliveryMethodType": "PICK_UP" }
+              {
+                "handle": "standard",
+                "title": "Standard Shipping",
+                "deliveryMethodType": "SHIPPING",
+                "cost": {
+                  "amount": "8.00"
+                }
+              },
+              {
+                "handle": "pickup",
+                "title": "Store Pickup",
+                "deliveryMethodType": "PICK_UP",
+                "cost": {
+                  "amount": "0.00"
+                }
+              }
             ]
           }
         ]
@@ -29,8 +58,19 @@
                 "k": "H",
                 "p": 10,
                 "s": 0,
-                "c": { "o": "A", "n": [{ "f": "subtotal", "q": ">=", "v": 100 }] },
-                "a": { "m": "PICK_UP" }
+                "c": {
+                  "o": "A",
+                  "n": [
+                    {
+                      "f": "subtotal",
+                      "q": ">=",
+                      "v": 100
+                    }
+                  ]
+                },
+                "a": {
+                  "m": "PICK_UP"
+                }
               }
             ]
           }
@@ -40,7 +80,11 @@
     },
     "output": {
       "operations": [
-        { "deliveryOptionHide": { "deliveryOptionHandle": "pickup" } }
+        {
+          "deliveryOptionHide": {
+            "deliveryOptionHandle": "pickup"
+          }
+        }
       ]
     }
   }

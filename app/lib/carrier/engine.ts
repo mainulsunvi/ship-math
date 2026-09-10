@@ -60,13 +60,17 @@ export interface CarrierRule {
 
 /** The normalized cart the carrier callback gives us (§A3 callback contract). */
 export interface CarrierCartContext {
-  destination: { country: string; province: string | null; postal: string | null };
+  destination: { country: string; province: string | null; postal: string | null; city?: string | null };
   currency: string; // requested presentation currency
   subtotal: string; // decimal string, shop currency
   weightGrams: number;
   quantity: number;
   skus: string[];
   vendors: string[];
+  /** Spec 021 §9: per-line UNIT prices (decimal numbers, money granularity). */
+  linePrices?: number[];
+  /** Spec 021 §9.3: wall-clock now in the shop timezone (YYYY-MM-DDTHH:mm). */
+  nowLocal?: string | null;
 }
 
 export interface ComputedRate {
@@ -200,6 +204,9 @@ function computeRateForAction(action: CarrierRateAction, cart: CarrierCartContex
 export function toCartFacts(cart: CarrierCartContext): CartFacts {
   return {
     subtotal: Number(cart.subtotal),
+    // Spec 021 §9: the carrier payload has no discount data, so the cart
+    // total is the line sum (same value the subtotal carries).
+    total: Number(cart.subtotal),
     quantity: cart.quantity,
     weight: cart.weightGrams,
     skus: cart.skus,
@@ -207,6 +214,9 @@ export function toCartFacts(cart: CarrierCartContext): CartFacts {
     productTags: [],
     customerTags: [],
     loggedIn: false,
+    ...(cart.linePrices !== undefined ? { linePrices: cart.linePrices } : {}),
+    ...(cart.destination.city !== undefined ? { city: cart.destination.city } : {}),
+    ...(cart.nowLocal !== undefined ? { nowLocal: cart.nowLocal } : {}),
   };
 }
 

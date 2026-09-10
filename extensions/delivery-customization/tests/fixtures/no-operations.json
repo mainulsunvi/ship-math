@@ -4,20 +4,47 @@
     "target": "cart.delivery-options.transform.run",
     "input": {
       "cart": {
-        "cost": { "subtotalAmount": { "amount": "75.00" } },
-        "buyerIdentity": { "isAuthenticated": false, "customer": null },
+        "cost": {
+          "subtotalAmount": {
+            "amount": "75.00"
+          },
+          "totalAmount": {
+            "amount": "75.00"
+          }
+        },
+        "buyerIdentity": {
+          "isAuthenticated": false,
+          "customer": null
+        },
         "lines": [],
         "deliveryGroups": [
           {
-            "deliveryAddress": { "countryCode": "US", "provinceCode": "CA", "zip": "94105" },
+            "deliveryAddress": {
+              "countryCode": "US",
+              "provinceCode": "CA",
+              "zip": "94105",
+              "city": "San Francisco"
+            },
             "deliveryOptions": [
-              { "handle": "standard", "title": "Standard Shipping", "deliveryMethodType": "SHIPPING" }
+              {
+                "handle": "standard",
+                "title": "Standard Shipping",
+                "deliveryMethodType": "SHIPPING",
+                "cost": {
+                  "amount": "8.00"
+                }
+              }
             ]
           }
         ]
       },
-      "deliveryCustomization": { "metafield": null, "c1": null }
+      "deliveryCustomization": {
+        "metafield": null,
+        "c1": null
+      }
     },
-    "output": { "operations": [] }
+    "output": {
+      "operations": []
+    }
   }
 }

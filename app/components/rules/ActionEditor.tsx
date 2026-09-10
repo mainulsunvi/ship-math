@@ -69,19 +69,46 @@ export interface FunctionActionDraft {
   titleContains: string;
   title: string;
   position: string;
+  /** Spec 020: targeting mode for HIDE (friendly labels, never engine enums). */
+  hideMode: string;
+  /** Spec 020: rank selector when hideMode is a rank mode. */
+  rank: string;
 }
 
+/** Spec 020 HIDE targeting modes (order = UI order; values are stable ids). */
+export const HIDE_MODE_OPTIONS = [
+  { label: "Hide matching rates", value: "HIDE_MATCHING" },
+  { label: "Show only matching rates (hide the rest)", value: "SHOW_MATCHING" },
+  { label: "Show only the cheapest rate (hide the rest)", value: "SHOW_CHEAPEST" },
+  { label: "Show only the most expensive rate (hide the rest)", value: "SHOW_MOST_EXPENSIVE" },
+  { label: "Hide the cheapest rate", value: "HIDE_CHEAPEST" },
+  { label: "Hide the most expensive rate", value: "HIDE_MOST_EXPENSIVE" },
+] as const;
+
 export function makeDefaultFunctionDraft(): FunctionActionDraft {
-  return { method: "", titleContains: "", title: "", position: "" };
+  return { method: "", titleContains: "", title: "", position: "", hideMode: "HIDE_MATCHING", rank: "" };
 }
 
 export function draftFromFunctionAction(action: unknown): FunctionActionDraft {
   const source = (action ?? {}) as Partial<RuleAction>;
+  const rank = source.target?.rank ?? "";
+  const invert = source.target?.invert === true;
+  // Reconstruct the mode from the stored shape (round-trips every mode).
+  let hideMode = "HIDE_MATCHING";
+  if (rank === "CHEAPEST") {
+    hideMode = invert ? "SHOW_CHEAPEST" : "HIDE_CHEAPEST";
+  } else if (rank === "MOST_EXPENSIVE") {
+    hideMode = invert ? "SHOW_MOST_EXPENSIVE" : "HIDE_MOST_EXPENSIVE";
+  } else if (invert) {
+    hideMode = "SHOW_MATCHING";
+  }
   return {
     method: source.target?.method ?? "",
     titleContains: source.target?.titleContains ?? "",
     title: source.title ?? "",
     position: typeof source.position === "number" ? String(source.position) : "",
+    hideMode,
+    rank,
   };
 }
 
@@ -90,11 +117,31 @@ export function buildFunctionAction(
   draft: FunctionActionDraft,
 ): { action: RuleAction | null; errors: string[] } {
   const target: OptionTarget = {};
-  if (draft.method !== "") {
-    target.method = draft.method;
+  const isRankMode =
+    draft.hideMode === "SHOW_CHEAPEST" ||
+    draft.hideMode === "SHOW_MOST_EXPENSIVE" ||
+    draft.hideMode === "HIDE_CHEAPEST" ||
+    draft.hideMode === "HIDE_MOST_EXPENSIVE";
+  if (kind === "HIDE" && isRankMode) {
+    // Rank modes carry no method/title filter (mutual exclusion, superRefine
+    // backstop) — the selector IS the match.
+    target.rank =
+      draft.hideMode === "SHOW_CHEAPEST" || draft.hideMode === "HIDE_CHEAPEST" ? "CHEAPEST" : "MOST_EXPENSIVE";
+  } else {
+    if (draft.method !== "") {
+      target.method = draft.method;
+    }
+    if (draft.titleContains.trim() !== "") {
+      target.titleContains = draft.titleContains.trim();
+    }
   }
-  if (draft.titleContains.trim() !== "") {
-    target.titleContains = draft.titleContains.trim();
+  if (
+    kind === "HIDE" &&
+    (draft.hideMode === "SHOW_MATCHING" ||
+      draft.hideMode === "SHOW_CHEAPEST" ||
+      draft.hideMode === "SHOW_MOST_EXPENSIVE")
+  ) {
+    target.invert = true;
   }
   if (kind === "HIDE") {
     return { action: { target }, errors: [] };
@@ -112,6 +159,80 @@ export function buildFunctionAction(
     return { action: { target, position }, errors: [] };
   }
   return { action: null, errors: ["Unsupported rule kind for a function action."] };
+}
+
+// ---------------------------------------------------------------------------
+// Chip summaries (spec 021: action chips inside the builder)
+// ---------------------------------------------------------------------------
+
+const METHOD_SHORT_LABELS: Record<string, string> = {
+  SHIPPING: "Shipping",
+  PICK_UP: "Pick up",
+  LOCAL: "Local delivery",
+  RETAIL: "Retail",
+};
+
+/** Short filter suffix like " · Shipping · contains X" (empty when unfiltered). */
+function describeFilter(draft: FunctionActionDraft): string {
+  const parts: string[] = [];
+  if (draft.method !== "") {
+    parts.push(METHOD_SHORT_LABELS[draft.method] ?? draft.method);
+  }
+  if (draft.titleContains.trim() !== "") {
+    parts.push(`contains "${draft.titleContains.trim()}"`);
+  }
+  return parts.length > 0 ? ` · ${parts.join(" · ")}` : "";
+}
+
+const HIDE_MODE_SUMMARIES: Record<string, string> = {
+  SHOW_CHEAPEST: "Show only the cheapest rate",
+  SHOW_MOST_EXPENSIVE: "Show only the most expensive rate",
+  HIDE_CHEAPEST: "Hide the cheapest rate",
+  HIDE_MOST_EXPENSIVE: "Hide the most expensive rate",
+};
+
+/** One-line chip summary for a THEN/ELSE function action draft. */
+export function describeFunctionDraft(kind: RuleKind, draft: FunctionActionDraft): string {
+  const filter = describeFilter(draft);
+  if (kind === "HIDE") {
+    const rank = HIDE_MODE_SUMMARIES[draft.hideMode];
+    if (rank !== undefined) {
+      return rank;
+    }
+    return draft.hideMode === "SHOW_MATCHING"
+      ? `Show only matching rates${filter}`
+      : `Hide matching rates${filter}`;
+  }
+  if (kind === "RENAME") {
+    const title = draft.title.trim();
+    return `Rename to "${title !== "" ? title : "..."}"${filter}`;
+  }
+  if (kind === "MOVE") {
+    return `Move to position ${draft.position.trim() !== "" ? draft.position.trim() : "0"}${filter}`;
+  }
+  return "Action";
+}
+
+function describeCarrierMode(draft: CarrierDraft): string {
+  if (draft.mode === "free") {
+    return "Free";
+  }
+  if (draft.mode === "tiered") {
+    return `${draft.tiers.length} tier${draft.tiers.length === 1 ? "" : "s"}`;
+  }
+  if (draft.mode === "percentage") {
+    return draft.percentage.trim() !== "" ? `${draft.percentage.trim()}%` : "Percentage";
+  }
+  return draft.amount.trim() !== "" ? `Flat ${draft.amount.trim()}` : "Flat rate";
+}
+
+/** One-line chip summary for the carrier rate draft. */
+export function describeCarrierDraft(draft: CarrierDraft): string {
+  const name = draft.serviceName.trim();
+  const code = draft.serviceCode.trim();
+  const label = name !== "" ? name : "Untitled rate";
+  const codeSuffix = code !== "" ? ` (${code})` : "";
+  return `Rate "${label}"${codeSuffix} · ${describeCarrierMode(draft)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,33 +431,55 @@ export default function ActionEditor({
 
   return (
     <BlockStack gap="300">
-      <InlineStack gap="100" blockAlign="center">
-        <Text as="h3" variant="headingSm">
-          Delivery Option Filters
-        </Text>
-        <HelpTooltip content="Optional. Leave the filters empty to target every delivery option." />
-      </InlineStack>
-      <InlineStack gap="300" wrap>
+      {kind === "HIDE" ? (
         <Select
-          label="Method"
-          options={METHOD_OPTIONS}
-          value={functionDraft.method}
-          onChange={function setMethod(next: string) {
-            onFunctionChange({ ...functionDraft, method: next });
+          label="Targeting"
+          options={HIDE_MODE_OPTIONS.map(function toOption(option) {
+            return { label: option.label, value: option.value };
+          })}
+          value={functionDraft.hideMode}
+          onChange={function setHideMode(next: string) {
+            onFunctionChange({ ...functionDraft, hideMode: next });
           }}
+          helpText="Show-only modes hide every rate except the one you keep. Rank modes pick by price."
           disabled={disabled}
         />
-        <TextField
-          label="Title contains"
-          autoComplete="off"
-          value={functionDraft.titleContains}
-          onChange={function setTitleContains(next: string) {
-            onFunctionChange({ ...functionDraft, titleContains: next });
-          }}
-          helpText="Case-insensitive substring match on the delivery option title."
-          disabled={disabled}
-        />
-      </InlineStack>
+      ) : null}
+      {kind !== "HIDE" ||
+      (functionDraft.hideMode !== "SHOW_CHEAPEST" &&
+        functionDraft.hideMode !== "SHOW_MOST_EXPENSIVE" &&
+        functionDraft.hideMode !== "HIDE_CHEAPEST" &&
+        functionDraft.hideMode !== "HIDE_MOST_EXPENSIVE") ? (
+        <>
+          <InlineStack gap="100" blockAlign="center">
+            <Text as="h3" variant="headingSm">
+              Delivery Option Filters
+            </Text>
+            <HelpTooltip content="Optional. Leave the filters empty to target every delivery option." />
+          </InlineStack>
+          <InlineStack gap="300" wrap>
+            <Select
+              label="Method"
+              options={METHOD_OPTIONS}
+              value={functionDraft.method}
+              onChange={function setMethod(next: string) {
+                onFunctionChange({ ...functionDraft, method: next });
+              }}
+              disabled={disabled}
+            />
+            <TextField
+              label="Title contains"
+              autoComplete="off"
+              value={functionDraft.titleContains}
+              onChange={function setTitleContains(next: string) {
+                onFunctionChange({ ...functionDraft, titleContains: next });
+              }}
+              helpText="Case-insensitive substring match on the delivery option title."
+              disabled={disabled}
+            />
+          </InlineStack>
+        </>
+      ) : null}
       {kind === "RENAME" ? (
         <TextField
           label="New title"

@@ -20,12 +20,12 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import prisma from "../db.server";
+import prisma, { readPrefs } from "../db.server";
 import { CarrierRateActionSchema } from "../lib/carrier/action-schema";
 import { computeRates, type CarrierRule, type CarrierCartContext } from "../lib/carrier/engine";
 import { CARRIER_HMAC_HEADER, verifyCarrierCallback } from "../lib/carrier/verify";
 import { parseStoredJson } from "../lib/config-schema";
-import { buildWireZones, toWireConditionGroup } from "../lib/function-config";
+import { buildWireZones, nowLocalIn, toWireConditionGroup } from "../lib/function-config";
 import { inputDigestFor, pruneIfDue, pruneRequestLogs } from "../lib/prune-logs";
 
 /** Cents (integer) → decimal string: 1250 → "12.50", 5 → "0.05". Integer math only. */
@@ -44,6 +44,7 @@ interface CarrierCallbackPayload {
       country?: string;
       province?: string;
       postal_code?: string;
+      city?: string;
     };
   };
   items?: Array<{
@@ -63,17 +64,23 @@ function sumItems(payload: CarrierCallbackPayload): {
   quantity: number;
   skus: string[];
   vendors: string[];
+  linePrices: number[];
 } {
   let subtotalCents = 0;
   let weightGrams = 0;
   let quantity = 0;
   const skus: string[] = [];
   const vendors: string[] = [];
+  const linePrices: number[] = [];
   for (const item of payload.items ?? []) {
     const qty = Math.max(0, Math.trunc(item.quantity ?? 0));
     subtotalCents += Math.max(0, Math.trunc(item.price ?? 0)) * qty;
     weightGrams += Math.max(0, Math.trunc(item.grams ?? 0)) * qty;
     quantity += qty;
+    // Spec 021 §9: unit price per line (cents ÷ 100 — exact at 2 decimals).
+    if (typeof item.price === "number" && Number.isFinite(item.price) && qty > 0) {
+      linePrices.push(Math.max(0, Math.trunc(item.price)) / 100);
+    }
     if (typeof item.sku === "string" && item.sku !== "" && !skus.includes(item.sku)) {
       skus.push(item.sku);
     }
@@ -81,7 +88,7 @@ function sumItems(payload: CarrierCallbackPayload): {
       vendors.push(item.vendor);
     }
   }
-  return { subtotalCents, weightGrams, quantity, skus, vendors };
+  return { subtotalCents, weightGrams, quantity, skus, vendors, linePrices };
 }
 
 function emptyRates() {
@@ -119,19 +126,20 @@ export async function action({ request }: ActionFunctionArgs) {
   }
   const shop = await prisma.shop.findUnique({
     where: { shopDomain: originDomain },
-    select: { id: true, testMode: true, evaluationMode: true },
+    select: { id: true, testMode: true, evaluationMode: true, prefs: true },
   });
   if (!shop || shop.testMode) {
     return emptyRates();
   }
 
   // 3. Map the payload onto the engine's cart context.
-  const { subtotalCents, weightGrams, quantity, skus, vendors } = sumItems(payload);
+  const { subtotalCents, weightGrams, quantity, skus, vendors, linePrices } = sumItems(payload);
   const cart: CarrierCartContext = {
     destination: {
       country: payload.rate?.destination?.country ?? "",
       province: payload.rate?.destination?.province ?? null,
       postal: payload.rate?.destination?.postal_code ?? null,
+      city: typeof payload.rate?.destination?.city === "string" ? payload.rate.destination.city : null,
     },
     currency: typeof payload.rate?.currency === "string" ? payload.rate.currency : "USD",
     subtotal: centsToDecimalString(subtotalCents),
@@ -139,6 +147,9 @@ export async function action({ request }: ActionFunctionArgs) {
     quantity,
     skus,
     vendors,
+    linePrices,
+    // Spec 021 §9.3: date/time conditions need the shop's wall clock.
+    nowLocal: nowLocalIn(readPrefs(shop).ianaTimezone),
   };
 
   // 4. Load rules + zones; honor the internal latency budget (1200ms guard

@@ -54,7 +54,8 @@ An orange banner saying the configuration changed since the last sync means the 
 Sometimes a sync succeeds but could not carry everything. When that happens, ShipMath will tell you exactly what was left behind:
 
 - **Truncated details**: a long piece of optional text was shortened to fit the checkout's size limit. The rule will still work, but some preview text was trimmed.
-- **Excluded rules**: a rule did not fit in the configuration at all, so it will be **not active at checkout**. It is not deleted, and it will stay in your rules table. Remove or switch off other rules to free up space, then sync again, and the rule will become active at checkout.
+- **Excluded rules**: a rule could not be carried into the checkout copy, most often because it did not fit in the size limit. It will be **not active at checkout**. It is not deleted, and it will stay in your rules table. Remove or switch off other rules to free up space, then sync again, and the rule will become active at checkout.
+- **Date and time rules**: a rule uses date, day of the week, or time of day conditions, which checkout delivery customization cannot evaluate because it runs with no clock. That rule is left out of the checkout copy for this reason, and it will keep running in the **carrier lane** and in the **simulator**. See [Shipping rules](rules.md#a-note-on-date-and-time) for how to split such a rule if you also need it at checkout.
 
 When you see one of these warnings, everything you saved is safe. The warning only means that a small part did not fit into the copy the checkout uses.
 

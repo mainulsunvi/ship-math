@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   BlockStack,
   Button,
+  ChoiceList,
   InlineStack,
   Select,
   Tag,
@@ -30,7 +31,21 @@ export const CARRIER_RATE_FORBIDDEN_FIELDS: ReadonlyArray<ConditionField> = [
 export const CARRIER_CONTEXT_TOOLTIP =
   "Carrier rates run without full cart context, so tags and login state are not available";
 
-type FieldInputKind = "number" | "text" | "tags" | "boolean";
+/**
+ * Spec 021 §9: date and time fields run ONLY in the carrier lane and the
+ * simulator — the checkout Function has no clock, so the config sync
+ * excludes them from the function mirror with an explicit reason.
+ */
+export const CLOCK_ONLY_FIELDS: ReadonlyArray<ConditionField> = [
+  "date",
+  "day_of_week",
+  "time_of_day",
+];
+
+export const CLOCK_CONTEXT_TOOLTIP =
+  "Date and time conditions run in the carrier lane and the simulator. They cannot run in the checkout Function, which has no clock.";
+
+type FieldInputKind = "number" | "text" | "tags" | "boolean" | "date" | "time" | "weekday";
 
 interface FieldMeta {
   label: string;
@@ -38,22 +53,28 @@ interface FieldMeta {
   operators: Operator[];
 }
 
-/** Exported for ConditionPicker's catalog (labels) — no behavior change. */
+/** Field labels + value editors. Exported for the picker/modal catalogs. */
 export const FIELD_META: Record<ConditionField, FieldMeta> = {
-  subtotal: { label: "Cart subtotal", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
-  weight: { label: "Cart weight", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
-  quantity: { label: "Item quantity", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
-  product_tag: { label: "Product tag", input: "tags", operators: ["eq", "neq", "in", "not_in"] },
-  sku: { label: "SKU", input: "text", operators: ["eq", "neq", "in", "not_in", "contains"] },
-  vendor: { label: "Vendor", input: "text", operators: ["eq", "neq", "in", "not_in", "contains"] },
-  customer_tag: { label: "Customer tag", input: "tags", operators: ["eq", "neq", "in", "not_in"] },
-  logged_in: { label: "Customer logged in", input: "boolean", operators: ["eq"] },
-  destination_country: { label: "Destination country", input: "text", operators: ["eq", "neq", "in", "not_in"] },
-  destination_province: { label: "Destination province", input: "text", operators: ["eq", "neq", "in", "not_in"] },
-  destination_postal: { label: "Destination postal code", input: "text", operators: ["eq", "neq", "in", "not_in"] },
+  subtotal: { label: "Cart - Subtotal", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  total: { label: "Cart - Total", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  weight: { label: "Cart - Weight", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  quantity: { label: "Item - Quantity", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  price: { label: "Item - Price", input: "number", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  product_tag: { label: "Product - Tag", input: "tags", operators: ["eq", "neq", "in", "not_in"] },
+  sku: { label: "Item - SKU", input: "text", operators: ["eq", "neq", "in", "not_in", "contains"] },
+  vendor: { label: "Item - Vendor", input: "text", operators: ["eq", "neq", "in", "not_in", "contains"] },
+  customer_tag: { label: "Customer - Tag", input: "tags", operators: ["eq", "neq", "in", "not_in"] },
+  logged_in: { label: "Customer - Logged in", input: "boolean", operators: ["eq"] },
+  city: { label: "City", input: "text", operators: ["eq", "neq", "in", "not_in", "contains"] },
+  date: { label: "Date", input: "date", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  day_of_week: { label: "Day of Week", input: "weekday", operators: ["in", "not_in"] },
+  time_of_day: { label: "Time of Day", input: "time", operators: ["eq", "neq", "gt", "gte", "lt", "lte"] },
+  destination_country: { label: "Destination - Country", input: "text", operators: ["eq", "neq", "in", "not_in"] },
+  destination_province: { label: "Destination - Province", input: "text", operators: ["eq", "neq", "in", "not_in"] },
+  destination_postal: { label: "Destination - Postal Code", input: "text", operators: ["eq", "neq", "in", "not_in"] },
 };
 
-const OPERATOR_LABELS: Record<Operator, string> = {
+export const OPERATOR_LABELS: Record<Operator, string> = {
   eq: "is",
   neq: "is not",
   gt: "greater than",
@@ -64,6 +85,22 @@ const OPERATOR_LABELS: Record<Operator, string> = {
   not_in: "is not one of",
   contains: "contains",
 };
+
+/** Weekday display order Monday-first; values are the 3-letter wire codes. */
+export const WEEKDAY_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: "Monday", value: "mon" },
+  { label: "Tuesday", value: "tue" },
+  { label: "Wednesday", value: "wed" },
+  { label: "Thursday", value: "thu" },
+  { label: "Friday", value: "fri" },
+  { label: "Saturday", value: "sat" },
+  { label: "Sunday", value: "sun" },
+];
+
+const WEEKDAY_LABELS: Record<string, string> = WEEKDAY_OPTIONS.reduce(function toMap(map, option) {
+  map[option.value] = option.label;
+  return map;
+}, {} as Record<string, string>);
 
 const LIST_OPERATORS: ReadonlyArray<Operator> = ["in", "not_in"];
 
@@ -94,6 +131,9 @@ function defaultValueFor(meta: FieldMeta, operator: Operator): string | number |
   }
   if (meta.input === "boolean") {
     return true;
+  }
+  if (meta.input === "weekday") {
+    return [];
   }
   return "";
 }
@@ -145,37 +185,69 @@ function toStringArray(value: Condition["value"]): string[] {
   return Array.isArray(value) ? value : [];
 }
 
-interface ConditionRowProps {
+// ---------------------------------------------------------------------------
+// Chip summaries (spec 021: condition chips inside the builder)
+// ---------------------------------------------------------------------------
+
+function describeValue(field: ConditionField, value: Condition["value"]): string {
+  const meta = FIELD_META[field];
+  if (Array.isArray(value)) {
+    if (meta.input === "weekday") {
+      const labels = value.map(function label(code: string) {
+        return WEEKDAY_LABELS[code.toLowerCase()] ?? code;
+      });
+      return labels.length > 0 ? labels.join(", ") : "no days";
+    }
+    return value.length > 0 ? value.join(", ") : "nothing";
+  }
+  if (typeof value === "boolean") {
+    return value ? "yes" : "no";
+  }
+  const text = String(value ?? "");
+  return text !== "" ? text : "empty";
+}
+
+/** One-line chip summary: "Cart subtotal is at least 50". */
+export function describeCondition(condition: Condition): string {
+  const meta = FIELD_META[condition.field];
+  const operator = OPERATOR_LABELS[condition.operator] ?? condition.operator;
+  return `${meta.label} - ${operator} ${describeValue(condition.field, condition.value)}`;
+}
+
+interface ConditionGroupLike {
+  combinator: string;
+  conditions: Array<Condition | ConditionGroupLike>;
+}
+
+/** True when any leaf under the group uses a clock-only field (spec 021 §9). */
+export function groupUsesClockFields(node: Condition | ConditionGroupLike): boolean {
+  if ("combinator" in node) {
+    return node.conditions.some(groupUsesClockFields);
+  }
+  return CLOCK_ONLY_FIELDS.includes(node.field);
+}
+
+// ---------------------------------------------------------------------------
+// Shared value editor (legacy row body + spec 021 ConditionModal body)
+// ---------------------------------------------------------------------------
+
+export interface ConditionValueInputProps {
   condition: Condition;
-  ruleKind: RuleKind;
   disabled?: boolean;
+  error?: string;
   onChange(next: Condition): void;
-  onRemove(): void;
 }
 
 /**
- * One field → operator → typed-value row. The value input type follows the
- * field (number / text / tag list / boolean); `in`/`not_in` always render the
- * tag-list editor because Condition.value stores string arrays for them.
+ * Operator + typed-value editor. The value input follows the field (number /
+ * text / tag list / boolean / date / time / weekday choices); `in`/`not_in`
+ * render the tag-list editor because Condition.value stores string arrays
+ * for them. Spec 021: also the body of ConditionModal's editor step, with an
+ * optional inline error for save-time validation.
  */
-export default function ConditionRow({
-  condition,
-  ruleKind,
-  disabled,
-  onChange,
-  onRemove,
-}: ConditionRowProps) {
+export function ConditionValueInput({ condition, disabled, error, onChange }: ConditionValueInputProps) {
   const meta = FIELD_META[condition.field];
   const listMode = isListOperator(condition.operator);
-
-  function handleFieldChange(next: string) {
-    const field = next as ConditionField;
-    const nextMeta = FIELD_META[field];
-    const operator = nextMeta.operators.includes(condition.operator)
-      ? condition.operator
-      : nextMeta.operators[0];
-    onChange({ field, operator, value: defaultValueFor(nextMeta, operator) });
-  }
 
   function handleOperatorChange(next: string) {
     const operator = next as Operator;
@@ -190,16 +262,7 @@ export default function ConditionRow({
   }
 
   return (
-    <InlineStack gap="200" blockAlign="end" wrap>
-      <Select
-        label="Field"
-        labelInline={false}
-        labelHidden
-        options={fieldOptions(ruleKind)}
-        value={condition.field}
-        onChange={handleFieldChange}
-        disabled={disabled}
-      />
+    <BlockStack gap="200">
       <Select
         label="Operator"
         labelHidden
@@ -208,10 +271,24 @@ export default function ConditionRow({
         onChange={handleOperatorChange}
         disabled={disabled}
       />
-      {listMode ? (
+      {meta.input === "weekday" ? (
+        <ChoiceList
+          title="Days"
+          titleHidden
+          allowMultiple
+          choices={WEEKDAY_OPTIONS}
+          selected={toStringArray(condition.value)}
+          onChange={function setDays(next: string[]) {
+            onChange({ ...condition, value: next });
+          }}
+          disabled={disabled}
+        />
+      ) : null}
+      {listMode && meta.input !== "weekday" ? (
         <TagListInput
           values={toStringArray(condition.value)}
           disabled={disabled}
+          error={error}
           onChange={function setList(next: string[]) {
             onChange({ ...condition, value: next });
           }}
@@ -227,6 +304,7 @@ export default function ConditionRow({
           value={typeof condition.value === "number" ? String(condition.value) : String(condition.value ?? "")}
           onChange={handleNumberChange}
           disabled={disabled}
+          error={error}
         />
       ) : null}
       {!listMode && meta.input === "boolean" ? (
@@ -244,6 +322,36 @@ export default function ConditionRow({
           disabled={disabled}
         />
       ) : null}
+      {!listMode && meta.input === "date" ? (
+        <TextField
+          label="Value"
+          labelHidden
+          type="date"
+          autoComplete="off"
+          value={typeof condition.value === "string" ? condition.value : ""}
+          onChange={function setDate(next: string) {
+            onChange({ ...condition, value: next });
+          }}
+          disabled={disabled}
+          error={error}
+          helpText="Compared in the shop time zone."
+        />
+      ) : null}
+      {!listMode && meta.input === "time" ? (
+        <TextField
+          label="Value"
+          labelHidden
+          type="time"
+          autoComplete="off"
+          value={typeof condition.value === "string" ? condition.value : ""}
+          onChange={function setTime(next: string) {
+            onChange({ ...condition, value: next });
+          }}
+          disabled={disabled}
+          error={error}
+          helpText="24-hour clock in the shop time zone, for example 9:00 or 14:30."
+        />
+      ) : null}
       {!listMode && (meta.input === "text" || meta.input === "tags") ? (
         <TextField
           label="Value"
@@ -254,8 +362,56 @@ export default function ConditionRow({
             onChange({ ...condition, value: next });
           }}
           disabled={disabled}
+          error={error}
         />
       ) : null}
+    </BlockStack>
+  );
+}
+
+interface ConditionRowProps {
+  condition: Condition;
+  ruleKind: RuleKind;
+  disabled?: boolean;
+  onChange(next: Condition): void;
+  onRemove(): void;
+}
+
+/**
+ * Legacy inline dropdown row. Spec 021 ConditionGroupEditor renders chips +
+ * ConditionModal instead; this row stays for compatibility and reuses the
+ * shared ConditionValueInput so both surfaces can never diverge.
+ */
+export default function ConditionRow({
+  condition,
+  ruleKind,
+  disabled,
+  onChange,
+  onRemove,
+}: ConditionRowProps) {
+  function handleFieldChange(next: string) {
+    const field = next as ConditionField;
+    const nextMeta = FIELD_META[field];
+    const operator = nextMeta.operators.includes(condition.operator)
+      ? condition.operator
+      : nextMeta.operators[0];
+    onChange({ field, operator, value: defaultValueFor(nextMeta, operator) });
+  }
+
+  return (
+    <InlineStack gap="200" blockAlign="end" wrap>
+      <Select
+        label="Field"
+        labelInline={false}
+        labelHidden
+        options={fieldOptions(ruleKind)}
+        value={condition.field}
+        onChange={handleFieldChange}
+        disabled={disabled}
+      />
+      <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+        <ConditionValueInput condition={condition} disabled={disabled} onChange={onChange} />
+      </div>
       <Button
         icon={DeleteIcon}
         variant="plain"
@@ -271,11 +427,12 @@ export default function ConditionRow({
 interface TagListInputProps {
   values: string[];
   disabled?: boolean;
+  error?: string;
   onChange(next: string[]): void;
 }
 
 /** Tag-list editor for `in` / `not_in` values (comma separated entry). */
-function TagListInput({ values, disabled, onChange }: TagListInputProps) {
+function TagListInput({ values, disabled, error, onChange }: TagListInputProps) {
   const [draft, setDraft] = useState("");
 
   function addDraft() {
@@ -305,6 +462,7 @@ function TagListInput({ values, disabled, onChange }: TagListInputProps) {
           value={draft}
           onChange={setDraft}
           disabled={disabled}
+          error={error}
         />
         <Button
           icon={PlusIcon}

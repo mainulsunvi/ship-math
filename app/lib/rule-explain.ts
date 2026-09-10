@@ -55,6 +55,8 @@ export interface RuleTrace {
   zoneGate?: ZoneGate;
   /** Function lane: the rule's action applies for this cart (per evaluation mode). */
   winner?: boolean;
+  /** Spec 021: the applied branch when the rule won (0 = THEN, 1 = ELSE). */
+  branch?: 0 | 1;
   /** Carrier lane: the rule matched AND produced a rate. */
   producedRate?: boolean;
 }
@@ -66,7 +68,24 @@ interface ConditionFailure {
 
 function isGroup(node: WireCondition | WireConditionGroup): node is WireConditionGroup {
   const candidate = node as WireConditionGroup;
-  return candidate.o === "A" || candidate.o === "O";
+  return candidate.o === "A" || candidate.o === "O" || candidate.o === "N";
+}
+
+/** First leaf under a group (depth-first) — the NONE-failure representative. */
+function firstLeaf(group: WireConditionGroup, path: string): ConditionFailure | undefined {
+  for (let index = 0; index < group.n.length; index++) {
+    const node = group.n[index];
+    const childPath = `${path}.n[${index}]`;
+    if (isGroup(node)) {
+      const nested = firstLeaf(node, childPath);
+      if (nested) {
+        return nested;
+      }
+    } else {
+      return { path: childPath, condition: node };
+    }
+  }
+  return undefined;
 }
 
 /** Leaf pass/fail via the shared evaluator: one condition wrapped in an AND group. */
@@ -83,6 +102,12 @@ function conditionPasses(condition: WireCondition, facts: CartFacts): boolean {
  * trailing return is a defensive fallback for the (impossible) empty case.
  */
 function explainGroupFailure(group: WireConditionGroup, path: string, facts: CartFacts): ConditionFailure | undefined {
+  if (group.o === "N") {
+    // Spec 021: NONE = NOT(OR) fails only when EVERY child passes — the
+    // representative condition is the first leaf (a passing one: it is the
+    // condition that made the "none" impossible).
+    return firstLeaf(group, path);
+  }
   for (let index = 0; index < group.n.length; index++) {
     const node = group.n[index];
     const childPath = `${path}.n[${index}]`;

@@ -95,9 +95,11 @@ export default function SyncStatusCard({
           <Button variant="primary" loading={busy} onClick={onSync}>
             Sync config to checkout
           </Button>
-          <Button loading={busy} onClick={onSeed}>
-            Add sample rules
-          </Button>
+          { ruleCount && ruleCount === 0 ? (
+            <Button loading={busy} onClick={onSeed}>
+              Add sample rules
+            </Button>
+          ) : null}
         </InlineStack>
         <Text as="p" variant="bodySm" tone="subdued">
           Test mode is {testMode ? "ON (the Function applies no operations)" : "off"} ·{" "}

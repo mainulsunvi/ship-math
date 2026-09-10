@@ -6,10 +6,10 @@
       "cart": {
         "cost": {
           "subtotalAmount": {
-            "amount": "75.00"
+            "amount": "150.00"
           },
           "totalAmount": {
-            "amount": "75.00"
+            "amount": "165.00"
           }
         },
         "buyerIdentity": {
@@ -19,6 +19,11 @@
         "lines": [
           {
             "quantity": 2,
+            "cost": {
+              "subtotalAmount": {
+                "amount": "60.00"
+              }
+            },
             "merchandise": {
               "sku": "SHIP-001",
               "weight": 2,
@@ -31,11 +36,6 @@
                     "tag": "fragile"
                   }
                 ]
-              }
-            },
-            "cost": {
-              "subtotalAmount": {
-                "amount": "60.00"
               }
             }
           }
@@ -58,14 +58,6 @@
                 }
               },
               {
-                "handle": "express",
-                "title": "Express Shipping",
-                "deliveryMethodType": "SHIPPING",
-                "cost": {
-                  "amount": "15.00"
-                }
-              },
-              {
                 "handle": "pickup",
                 "title": "Store Pickup",
                 "deliveryMethodType": "PICK_UP",
@@ -82,10 +74,10 @@
           "jsonValue": {
             "v": 1,
             "t": 0,
-            "m": "F",
+            "m": "A",
             "r": [
               {
-                "i": "r1",
+                "i": "r-multi",
                 "k": "R",
                 "p": 10,
                 "s": 0,
@@ -93,16 +85,32 @@
                   "o": "A",
                   "n": [
                     {
-                      "f": "subtotal",
-                      "q": ">=",
-                      "v": 50
+                      "f": "price",
+                      "q": "<=",
+                      "v": 100
+                    },
+                    {
+                      "f": "city",
+                      "q": "=",
+                      "v": "san francisco"
                     }
                   ]
                 },
-                "a": {
-                  "tc": "standard",
-                  "ti": "Standard (3-5 days)"
-                }
+                "as": [
+                  {
+                    "m": "SHIPPING",
+                    "ti": "Ship It"
+                  },
+                  {
+                    "m": "PICK_UP",
+                    "ti": "Collect"
+                  }
+                ],
+                "ea": [
+                  {
+                    "ti": "Not Fired"
+                  }
+                ]
               }
             ]
           }
@@ -115,7 +123,13 @@
         {
           "deliveryOptionRename": {
             "deliveryOptionHandle": "standard",
-            "title": "Standard (3-5 days)"
+            "title": "Ship It"
+          }
+        },
+        {
+          "deliveryOptionRename": {
+            "deliveryOptionHandle": "pickup",
+            "title": "Collect"
           }
         }
       ]

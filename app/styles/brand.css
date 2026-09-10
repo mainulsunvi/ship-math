@@ -309,3 +309,71 @@
     display: none;
   }
 }
+
+/*
+ * Spec 021 rule builder chips: one-line summaries for conditions and
+ * actions, with plain icon buttons (edit/delete) trailing. Raw elements
+ * because Polaris Box exposes no style prop; colors/sizes stay on tokens
+ * with literal fallbacks for safety.
+ */
+.sm-rule-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--p-space-200, 8px);
+  border: 1px solid var(--p-color-border, #8c9196);
+  border-radius: var(--p-border-radius-200, 8px);
+  background: var(--p-color-bg-surface, #fff);
+  padding: var(--p-space-500, 1.25rem) var(--p-space-300, 0.75rem);
+  min-width: 0;
+}
+
+.sm-rule-chip__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--p-text-body-md-font-size, 0.8125rem);
+}
+
+.sm-rule-chip__index {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  border-radius: var(--p-border-radius-100, 4px);
+  background: var(--sm-accent-subdued);
+  color: var(--sm-accent-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Else connector: the "when the conditions do not match" bridge between the
+   Then and Else cards. */
+.sm-else-connector {
+  display: flex;
+  align-items: center;
+  gap: var(--p-space-200, 8px);
+  padding-inline-start: var(--p-space-100, 4px);
+}
+
+/* Condition tier cards (Basic selected / Advanced coming soon). */
+.sm-tier-card {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--p-space-100, 4px);
+  border: 1px solid var(--p-color-border, #8c9196);
+  border-radius: var(--p-border-radius-200, 8px);
+  padding: var(--p-space-300, 12px) var(--p-space-400, 16px);
+}
+
+.sm-tier-card--selected {
+  border-color: var(--sm-accent-border);
+  background: var(--sm-accent-subdued);
+}
+
+.sm-tier-card--disabled {
+  opacity: 0.6;
+}

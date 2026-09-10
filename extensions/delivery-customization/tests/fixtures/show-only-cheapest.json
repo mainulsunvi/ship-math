@@ -6,40 +6,17 @@
       "cart": {
         "cost": {
           "subtotalAmount": {
-            "amount": "75.00"
+            "amount": "150.00"
           },
           "totalAmount": {
-            "amount": "75.00"
+            "amount": "150.00"
           }
         },
         "buyerIdentity": {
           "isAuthenticated": false,
           "customer": null
         },
-        "lines": [
-          {
-            "quantity": 2,
-            "merchandise": {
-              "sku": "SHIP-001",
-              "weight": 2,
-              "weightUnit": "KILOGRAMS",
-              "product": {
-                "vendor": "ShipMath Co",
-                "hasTags": [
-                  {
-                    "hasTag": true,
-                    "tag": "fragile"
-                  }
-                ]
-              }
-            },
-            "cost": {
-              "subtotalAmount": {
-                "amount": "60.00"
-              }
-            }
-          }
-        ],
+        "lines": [],
         "deliveryGroups": [
           {
             "deliveryAddress": {
@@ -58,19 +35,19 @@
                 }
               },
               {
-                "handle": "express",
-                "title": "Express Shipping",
+                "handle": "economy",
+                "title": "Economy",
                 "deliveryMethodType": "SHIPPING",
                 "cost": {
-                  "amount": "15.00"
+                  "amount": "5.00"
                 }
               },
               {
-                "handle": "pickup",
-                "title": "Store Pickup",
-                "deliveryMethodType": "PICK_UP",
+                "handle": "express",
+                "title": "Express",
+                "deliveryMethodType": "SHIPPING",
                 "cost": {
-                  "amount": "0.00"
+                  "amount": "15.00"
                 }
               }
             ]
@@ -86,22 +63,12 @@
             "r": [
               {
                 "i": "r1",
-                "k": "R",
+                "k": "H",
                 "p": 10,
                 "s": 0,
-                "c": {
-                  "o": "A",
-                  "n": [
-                    {
-                      "f": "subtotal",
-                      "q": ">=",
-                      "v": 50
-                    }
-                  ]
-                },
                 "a": {
-                  "tc": "standard",
-                  "ti": "Standard (3-5 days)"
+                  "rk": "C",
+                  "iv": 1
                 }
               }
             ]
@@ -113,9 +80,13 @@
     "output": {
       "operations": [
         {
-          "deliveryOptionRename": {
-            "deliveryOptionHandle": "standard",
-            "title": "Standard (3-5 days)"
+          "deliveryOptionHide": {
+            "deliveryOptionHandle": "standard"
+          }
+        },
+        {
+          "deliveryOptionHide": {
+            "deliveryOptionHandle": "express"
           }
         }
       ]

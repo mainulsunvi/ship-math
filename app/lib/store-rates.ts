@@ -18,7 +18,7 @@
  * page calls buildCheckoutOptions per render.
  */
 
-import { optionMatchesTarget, type WireAction } from "./rule-evaluation";
+import { optionMatchesTarget, resolveRankHandles, type WireAction } from "./rule-evaluation";
 import type { SimFunctionOperation } from "./simulate";
 
 /** One Shopify-defined shipping method (a delivery method definition). */
@@ -345,6 +345,8 @@ function opToAction(operation: SimFunctionOperation): WireAction {
     tc: operation.titleContains,
     ti: operation.title,
     ix: operation.index,
+    rk: operation.rank,
+    iv: operation.invert === true ? 1 : undefined,
   };
 }
 
@@ -363,12 +365,17 @@ export function buildCheckoutOptions(input: {
   functionOperations: SimFunctionOperation[];
   carrierRates: Array<{ serviceCode: string; serviceName: string; priceCents: string }>;
 }): CheckoutPreview {
-  function matches(option: { title: string }, operation: SimFunctionOperation): boolean {
-    return optionMatchesTarget(opToAction(operation), {
-      handle: option.title,
-      title: option.title,
-      methodType: "SHIPPING",
-    });
+  function matches(option: { code: string; title: string }, operation: SimFunctionOperation): boolean {
+    return optionMatchesTarget(
+      opToAction(operation),
+      {
+        handle: option.code,
+        title: option.title,
+        methodType: "SHIPPING",
+        cost: costByCode.get(option.code) ?? null,
+      },
+      ranks,
+    );
   }
 
   const customizations: CheckoutCustomization[] = [];
@@ -390,6 +397,25 @@ export function buildCheckoutOptions(input: {
       };
     }),
   ];
+
+  // Spec 020: ranks resolve against the ORIGINAL combined list — before any
+  // op removes an option — mirroring how the Function ranks checkout's
+  // untouched delivery group (a hidden option can still BE the cheapest).
+  const costByCode = new Map(
+    options.map(function toCost(option) {
+      return [option.code, Number.parseFloat(option.price)] as const;
+    }),
+  );
+  const ranks = resolveRankHandles(
+    options.map(function toFacts(option) {
+      return {
+        handle: option.code,
+        title: option.title,
+        methodType: "SHIPPING",
+        cost: costByCode.get(option.code) ?? null,
+      };
+    }),
+  );
 
   // Apply the ops in rule priority order (functionOperations preserves it),
   // exactly as the Function walks decisions over the delivery group.

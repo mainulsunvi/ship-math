@@ -7,6 +7,9 @@ query CartDeliveryOptionsTransformRunInput(
       subtotalAmount {
         amount
       }
+      totalAmount {
+        amount
+      }
     }
     buyerIdentity {
       isAuthenticated
@@ -19,6 +22,11 @@ query CartDeliveryOptionsTransformRunInput(
     }
     lines {
       quantity
+      cost {
+        subtotalAmount {
+          amount
+        }
+      }
       merchandise {
         ... on ProductVariant {
           sku
@@ -39,11 +47,15 @@ query CartDeliveryOptionsTransformRunInput(
         countryCode
         provinceCode
         zip
+        city
       }
       deliveryOptions {
         handle
         title
         deliveryMethodType
+        cost {
+          amount
+        }
       }
     }
   }

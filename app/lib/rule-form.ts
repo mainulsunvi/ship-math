@@ -12,6 +12,7 @@ import {
   ActionSchema,
   ConditionGroupSchema,
   RuleKindSchema,
+  normalizeFunctionActions,
   type RuleInput,
   type RuleKind,
 } from "./config-schema";
@@ -25,13 +26,42 @@ export function zodIssuesText(error: z.ZodError): string {
     .join("; ");
 }
 
+/** Spec 021: NONE is root-only — nested groups using it are rejected here
+ * (the StoredRuleSchema superRefine is the backstop). */
+function findNestedNone(node: unknown): boolean {
+  if (!node || typeof node !== "object" || Array.isArray(node)) {
+    return false;
+  }
+  const entry = node as { combinator?: unknown; conditions?: unknown };
+  if (!Array.isArray(entry.conditions)) {
+    return false;
+  }
+  for (const child of entry.conditions) {
+    if (!child || typeof child !== "object" || Array.isArray(child)) {
+      continue;
+    }
+    const childEntry = child as { combinator?: unknown };
+    if (childEntry.combinator === "NONE" || findNestedNone(child)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function parseConditionsField(
   formData: FormData,
 ): { ok: true; value: RuleInput["conditions"] } | { ok: false; message: string } {
   try {
-    const result = ConditionGroupSchema.safeParse(JSON.parse(String(formData.get("conditions") ?? "null")));
+    const raw = JSON.parse(String(formData.get("conditions") ?? "null"));
+    const result = ConditionGroupSchema.safeParse(raw);
     if (!result.success) {
       return { ok: false, message: `Conditions failed validation: ${zodIssuesText(result.error)}` };
+    }
+    if (findNestedNone(raw)) {
+      return {
+        ok: false,
+        message: 'The "none" match type can only be used at the top level of the conditions.',
+      };
     }
     return { ok: true, value: result.data as RuleInput["conditions"] };
   } catch {
@@ -45,14 +75,23 @@ function parseActionField(
 ): { ok: true; value: RuleInput["action"] } | { ok: false; message: string } {
   try {
     const rawAction: unknown = JSON.parse(String(formData.get("action") ?? "null"));
-    const result =
-      kind === "CARRIER_RATE"
-        ? CarrierRateActionSchema.safeParse(rawAction)
-        : ActionSchema.safeParse(rawAction);
-    if (!result.success) {
-      return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
+    if (kind === "CARRIER_RATE") {
+      const result = CarrierRateActionSchema.safeParse(rawAction);
+      if (!result.success) {
+        return { ok: false, message: `Action failed validation: ${zodIssuesText(result.error)}` };
+      }
+      return { ok: true, value: result.data as RuleInput["action"] };
     }
-    return { ok: true, value: result.data as RuleInput["action"] };
+    // Spec 021: function kinds carry the { actions, elseActions } wrapper;
+    // a legacy single-action payload still parses (normalized to one
+    // then-action) so old callers (wizard intents) keep working.
+    const normalized = normalizeFunctionActions(rawAction);
+    if (normalized.actions.length === 0 || !normalized.actions.every(function valid(action) {
+      return ActionSchema.safeParse(action).success;
+    })) {
+      return { ok: false, message: "Action failed validation: at least one complete action is required." };
+    }
+    return { ok: true, value: normalized };
   } catch {
     return { ok: false, message: "Action is not valid JSON." };
   }

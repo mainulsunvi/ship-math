@@ -9,6 +9,7 @@ interface ShipMathPageProps {
   secondaryActions?: PageProps["secondaryActions"];
   backAction?: PageProps["backAction"];
   children: ReactNode;
+  titleMetadata?: ReactNode[];
 }
 
 /**
@@ -23,6 +24,7 @@ export default function ShipMathPage({
   secondaryActions,
   backAction,
   children,
+  titleMetadata,
 }: ShipMathPageProps) {
   return (
     <Box>
@@ -32,6 +34,7 @@ export default function ShipMathPage({
         primaryAction={primaryAction}
         secondaryActions={secondaryActions}
         backAction={backAction}
+        titleMetadata={[...(titleMetadata ?? [])]}
       >
         {children}
       </Page>

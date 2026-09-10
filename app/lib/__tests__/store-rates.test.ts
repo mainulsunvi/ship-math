@@ -465,6 +465,34 @@ describe("buildCheckoutOptions", function testCombined() {
     expect(preview.unmatchedOps).toBe(0);
   });
 
+  it("020 parity: show only the cheapest rate hides everything else in the combined list", function showCheapest() {
+    const preview = buildCheckoutOptions({
+      storeRates: rates,
+      cart: US_CART,
+      functionOperations: [{ ruleId: "r1", ruleName: "Cheapest only", kind: "HIDE", rank: "C", invert: true }],
+      carrierRates: CARRIER,
+    });
+    // Combined list: Standard 0.00, Express 15.00, Flat 5 5.00 → cheapest survives.
+    expect(preview.options.map(function title(option) {
+      return option.title;
+    })).toEqual(["Standard"]);
+    expect(preview.customizations.map(function title(entry) {
+      return entry.title;
+    }).sort()).toEqual(["Express", "Flat 5"]);
+  });
+
+  it("020 parity: show only rates containing a name keeps future unmatched rates hidden", function showNamed() {
+    const preview = buildCheckoutOptions({
+      storeRates: rates,
+      cart: US_CART,
+      functionOperations: [{ ruleId: "r1", ruleName: "Standard only", kind: "HIDE", titleContains: "standard", invert: true }],
+      carrierRates: CARRIER,
+    });
+    expect(preview.options.map(function title(option) {
+      return option.title;
+    })).toEqual(["Standard"]);
+  });
+
   it("hides only the targeted option (case-insensitive contains) and records it", function hidesTargeted() {
     const preview = buildCheckoutOptions({
       storeRates: rates,

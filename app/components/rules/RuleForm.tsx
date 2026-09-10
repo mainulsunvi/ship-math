@@ -9,45 +9,51 @@ import {
   Button,
   Card,
   Box,
+  Badge,
 } from "@shopify/polaris";
+import { DeleteIcon, EditIcon } from "@shopify/polaris-icons";
 import { CarrierRateActionSchema } from "../../lib/carrier/action-schema";
 import {
   ActionSchema,
   ConditionGroupSchema,
   RuleKindSchema,
+  normalizeFunctionActions,
   type ConditionGroup,
   type RuleKind,
 } from "../../lib/config-schema";
 import type { ZodIssue } from "zod";
-import ActionEditor, {
+import {
   buildCarrierAction,
   buildFunctionAction,
+  describeCarrierDraft,
+  describeFunctionDraft,
   draftFromCarrierAction,
   draftFromFunctionAction,
   makeDefaultCarrierDraft,
-  makeDefaultFunctionDraft,
   type CarrierDraft,
   type FunctionActionDraft,
 } from "./ActionEditor";
+import ActionModal from "./ActionModal";
 import ConditionGroupEditor, { sanitizeConditionsForKind } from "./ConditionGroupEditor";
 import KindChip from "./KindChip";
 import SettingToggle from "../ui/SettingToggle";
 import HelpTooltip from "../ui/HelpTooltip";
 
 /**
- * Reusable rule form — ONE component for both create (/app/rules/new) and
- * edit (/app/routes/:uid/edit) per the user decision of 2026-09-07 (rules
- * live on routes, not modals; zones and other flows stay modal-based).
- * The draft state + validation were carried over VERBATIM from the original
- * RuleEditorModal; only the shell changed (Modal → Card sections).
+ * Spec 021 scenario rule builder. ONE component for create (/app/rules/new)
+ * and edit (/app/rules/:uid/edit) per the user decision of 2026-09-07.
+ *
+ * Structure (user directive 2026-09-09: condition + action forms live in
+ * modals; card flow improvised per spec 021 §6; 2026-09-11: no kind select —
+ * the FIRST action's "What the rule does" picker IS the kind):
+ *   - Basics card: name / priority / zone / stop on match
+ *   - Conditions card: tier selector (Basic today, Advanced coming soon)
+ *     + the chip builder (ConditionGroupEditor + ConditionModal)
+ *   - Then card: ordered action chips, each edited in the ActionModal
+ *   - Else card (function kinds): optional actions that run when the
+ *     conditions do NOT match; serialized as { actions, elseActions }
+ *   - Carrier kind keeps the single rate action edited in the ActionModal
  */
-
-const KIND_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: "Hide delivery options", value: "HIDE" },
-  { label: "Rename delivery option", value: "RENAME" },
-  { label: "Move delivery option", value: "MOVE" },
-  { label: "Custom carrier rate (server lane)", value: "CARRIER_RATE" },
-];
 
 const NO_ZONE_VALUE = "";
 
@@ -57,7 +63,10 @@ function toConditionGroup(input: unknown): ConditionGroup {
     const candidate = parsed.data as unknown as ConditionGroup;
     if (Array.isArray(candidate.conditions)) {
       return {
-        combinator: candidate.combinator === "OR" ? "OR" : "AND",
+        combinator:
+          candidate.combinator === "OR" || candidate.combinator === "NONE"
+            ? candidate.combinator
+            : "AND",
         conditions: candidate.conditions,
       };
     }
@@ -123,6 +132,34 @@ function RuleFormSection({ label, help, divider, children }: {
   );
 }
 
+interface ActionModalState {
+  open: boolean;
+  branch: 0 | 1;
+  editMode: "create" | "edit";
+  index?: number;
+}
+
+const CLOSED_ACTION_MODAL: ActionModalState = { open: false, branch: 0, editMode: "create" };
+
+function initialDraftsFor(kind: RuleKind, action: unknown, isCreate: boolean): {
+  then: FunctionActionDraft[];
+  else: FunctionActionDraft[];
+} {
+  // No seeding: the first action the merchant adds (and its "What the rule
+  // does" picker) decides the kind, so a fresh form starts genuinely empty.
+  if (isCreate || kind === "CARRIER_RATE") {
+    return { then: [], else: [] };
+  }
+  const wrapper = normalizeFunctionActions(action);
+  const then = wrapper.actions.map(function toDraft(entry: unknown) {
+    return draftFromFunctionAction(entry);
+  });
+  const elseBranch = wrapper.elseActions.map(function toDraft(entry: unknown) {
+    return draftFromFunctionAction(entry);
+  });
+  return { then, else: elseBranch };
+}
+
 export default function RuleForm({
   mode,
   zones,
@@ -153,23 +190,145 @@ export default function RuleForm({
   const [conditions, setConditions] = useState<ConditionGroup>(function initConditions() {
     return toConditionGroup(initial?.conditions);
   });
-  const [functionDraft, setFunctionDraft] = useState<FunctionActionDraft>(
-    function initFunctionDraft() {
-      return kind === "CARRIER_RATE" ? makeDefaultFunctionDraft() : draftFromFunctionAction(initial?.action);
-    },
-  );
+  const [thenDrafts, setThenDrafts] = useState<FunctionActionDraft[]>(function initThen() {
+    return initialDraftsFor(
+      RuleKindSchema.safeParse(initial?.kind).success
+        ? (RuleKindSchema.parse(initial?.kind) as RuleKind)
+        : "HIDE",
+      initial?.action,
+      mode === "create",
+    ).then;
+  });
+  const [elseDrafts, setElseDrafts] = useState<FunctionActionDraft[]>(function initElse() {
+    return initialDraftsFor(
+      RuleKindSchema.safeParse(initial?.kind).success
+        ? (RuleKindSchema.parse(initial?.kind) as RuleKind)
+        : "HIDE",
+      initial?.action,
+      mode === "create",
+    ).else;
+  });
   const [carrierDraft, setCarrierDraft] = useState<CarrierDraft>(function initCarrierDraft() {
     return kind === "CARRIER_RATE" ? draftFromCarrierAction(initial?.action) : makeDefaultCarrierDraft();
   });
   const [errors, setErrors] = useState<string[]>([]);
+  const [actionModal, setActionModal] = useState<ActionModalState>(CLOSED_ACTION_MODAL);
+  const [carrierModalOpen, setCarrierModalOpen] = useState(false);
 
-  function handleKindChange(next: string) {
-    const nextKind = next as RuleKind;
+  // The kind is derived from the actions (2026-09-11): it is locked while
+  // any then/else draft or a saved rate exists, and re-choosable inside the
+  // ActionModal once the rule has no actions at all.
+  const carrierConfigured = kind === "CARRIER_RATE" && carrierDraft.serviceName.trim() !== "";
+  const actionsLocked = thenDrafts.length > 0 || elseDrafts.length > 0 || carrierConfigured;
+
+  function applyKind(nextKind: RuleKind) {
     setKind(nextKind);
     // §A3: switching to CARRIER_RATE drops conditions it can never evaluate.
     setConditions(function prune(current: ConditionGroup) {
       return sanitizeConditionsForKind(current, nextKind);
     });
+  }
+
+  function removeCarrierRate() {
+    setCarrierDraft(makeDefaultCarrierDraft());
+    setKind("HIDE");
+  }
+
+  function openActionModal(branch: 0 | 1, editMode: "create" | "edit", index?: number) {
+    setActionModal({ open: true, branch, editMode, index });
+  }
+
+  function handleActionModalSaved(payload: {
+    kind: RuleKind;
+    functionDraft: FunctionActionDraft;
+    carrierDraft: CarrierDraft;
+  }) {
+    const { branch, editMode, index } = actionModal;
+    // The modal's kind choice is the rule's kind (the picker only shows
+    // while the rule has no actions, so no existing draft is invalidated).
+    if (payload.kind === "CARRIER_RATE") {
+      applyKind("CARRIER_RATE");
+      setCarrierDraft(payload.carrierDraft);
+      setActionModal(CLOSED_ACTION_MODAL);
+      return;
+    }
+    if (payload.kind !== kind) {
+      applyKind(payload.kind);
+    }
+    if (editMode === "edit" && typeof index === "number") {
+      const next = (branch === 0 ? thenDrafts : elseDrafts).slice();
+      next[index] = payload.functionDraft;
+      if (branch === 0) {
+        setThenDrafts(next);
+      } else {
+        setElseDrafts(next);
+      }
+    } else if (branch === 0) {
+      setThenDrafts([...thenDrafts, payload.functionDraft]);
+    } else {
+      setElseDrafts([...elseDrafts, payload.functionDraft]);
+    }
+    setActionModal(CLOSED_ACTION_MODAL);
+  }
+
+  function removeDraft(branch: 0 | 1, index: number) {
+    if (branch === 0) {
+      setThenDrafts(
+        thenDrafts.filter(function keep(_, position) {
+          return position !== index;
+        }),
+      );
+    } else {
+      setElseDrafts(
+        elseDrafts.filter(function keep(_, position) {
+          return position !== index;
+        }),
+      );
+    }
+  }
+
+  function renderActionChips(branch: 0 | 1) {
+    const drafts = branch === 0 ? thenDrafts : elseDrafts;
+    if (drafts.length === 0) {
+      return (
+        <Text as="span" variant="bodySm" tone="subdued">
+          {branch === 0
+            ? "No actions yet. Add at least one."
+            : "No else actions. Else is optional."}
+        </Text>
+      );
+    }
+    return (
+      <BlockStack gap="150">
+        {drafts.map(function renderChip(draft, index) {
+          return (
+            <div className="sm-rule-chip" key={`${branch}-${index}`}>
+              <span className="sm-rule-chip__index">{index + 1}</span>
+              <span className="sm-rule-chip__label">{describeFunctionDraft(kind, draft)}</span>
+              <Button
+                icon={EditIcon}
+                variant="plain"
+                accessibilityLabel="Edit action"
+                onClick={function edit() {
+                  openActionModal(branch, "edit", index);
+                }}
+                disabled={busy}
+              />
+              <Button
+                icon={DeleteIcon}
+                variant="plain"
+                tone="critical"
+                accessibilityLabel="Remove action"
+                onClick={function remove() {
+                  removeDraft(branch, index);
+                }}
+                disabled={busy}
+              />
+            </div>
+          );
+        })}
+      </BlockStack>
+    );
   }
 
   function handleSubmit() {
@@ -198,16 +357,46 @@ export default function RuleForm({
       }
       actionValue = built.action;
     } else {
-      const built = buildFunctionAction(kind, functionDraft);
-      if (built.action === null) {
-        collected.push(...built.errors);
-      } else {
+      // THEN branch (min 1 action, in chip order).
+      const thenActions: unknown[] = [];
+      thenDrafts.forEach(function build(draft, index) {
+        const built = buildFunctionAction(kind, draft);
+        if (built.action === null) {
+          collected.push(...built.errors.map(function prefix(message: string) {
+            return `Then action ${index + 1}: ${message}`;
+          }));
+          return;
+        }
         const check = ActionSchema.safeParse(built.action);
         if (!check.success) {
-          collected.push("The action is incomplete.");
+          collected.push(`Then action ${index + 1}: the action is incomplete.`);
+          return;
         }
+        thenActions.push(built.action);
+      });
+      if (thenActions.length === 0 && thenDrafts.length === 0) {
+        collected.push("Add at least one action for the Then branch.");
       }
-      actionValue = built.action;
+
+      // ELSE branch (optional, also in chip order).
+      const elseActions: unknown[] = [];
+      elseDrafts.forEach(function build(draft, index) {
+        const built = buildFunctionAction(kind, draft);
+        if (built.action === null) {
+          collected.push(...built.errors.map(function prefix(message: string) {
+            return `Else action ${index + 1}: ${message}`;
+          }));
+          return;
+        }
+        const check = ActionSchema.safeParse(built.action);
+        if (!check.success) {
+          collected.push(`Else action ${index + 1}: the action is incomplete.`);
+          return;
+        }
+        elseActions.push(built.action);
+      });
+
+      actionValue = { actions: thenActions, elseActions };
     }
 
     if (collected.length > 0) {
@@ -257,7 +446,7 @@ export default function RuleForm({
           <Text as="h2" variant="headingMd">
             {mode === "create" ? "New Rule" : "Edit Rule"}
           </Text>
-          <KindChip kind={kind} />
+          {actionsLocked ? <KindChip kind={kind} /> : null}
         </InlineStack>
 
         <RuleFormSection label="Basics">
@@ -268,14 +457,6 @@ export default function RuleForm({
               autoComplete="off"
               value={name}
               onChange={setName}
-              disabled={busy}
-            />
-            <Select
-              label="Rule kind"
-              options={KIND_OPTIONS}
-              value={kind}
-              onChange={handleKindChange}
-              helpText="What the rule does at checkout."
               disabled={busy}
             />
             <TextField
@@ -299,7 +480,7 @@ export default function RuleForm({
           </InlineStack>
           <SettingToggle
             label="Stop on match"
-            helpText='With the "All matches apply" evaluation mode, rules after this one are skipped once it matches.'
+            helpText='With the in  evaluation mode, rules after this one are skipped once it matches.'
             enabled={stopOnMatch}
             disabled={busy}
             onChange={setStopOnMatch}
@@ -308,9 +489,33 @@ export default function RuleForm({
 
         <RuleFormSection
           label="Conditions"
-          help="The rule runs its action only when these conditions match. An empty group matches every checkout."
+          help="The rule runs its Then actions only when these conditions match. An empty group matches every checkout."
           divider
         >
+          <InlineStack gap="300" wrap blockAlign="stretch">
+            <div className="sm-tier-card sm-tier-card--selected">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Basic
+                </Text>
+                <Badge tone="info">Selected</Badge>
+              </InlineStack>
+              <Text as="span" variant="bodySm" tone="subdued">
+                Cart, product, customer, and date and time fields.
+              </Text>
+            </div>
+            <div className="sm-tier-card sm-tier-card--disabled">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  Advanced
+                </Text>
+                <Badge>Coming soon</Badge>
+              </InlineStack>
+              <Text as="span" variant="bodySm" tone="subdued">
+                Line item properties, discount codes, and more.
+              </Text>
+            </div>
+          </InlineStack>
           <ConditionGroupEditor
             group={conditions}
             depth={1}
@@ -320,20 +525,89 @@ export default function RuleForm({
           />
         </RuleFormSection>
 
-        <RuleFormSection
-          label="Action"
-          help="What checkout does with the delivery options when the conditions match."
-          divider
-        >
-          <ActionEditor
-            kind={kind}
-            functionDraft={functionDraft}
-            carrierDraft={carrierDraft}
-            disabled={busy}
-            onFunctionChange={setFunctionDraft}
-            onCarrierChange={setCarrierDraft}
-          />
-        </RuleFormSection>
+        {kind === "CARRIER_RATE" ? (
+          <RuleFormSection
+            label="Rate"
+            help="The rate this rule offers through the carrier lane when the conditions match."
+            divider
+          >
+            <BlockStack gap="200">
+              {carrierDraft.serviceName.trim() !== "" || carrierDraft.serviceCode.trim() !== "" ? (
+                <div className="sm-rule-chip">
+                  <span className="sm-rule-chip__label">{describeCarrierDraft(carrierDraft)}</span>
+                  <Button
+                    icon={EditIcon}
+                    variant="plain"
+                    accessibilityLabel="Edit rate"
+                    onClick={function edit() {
+                      setCarrierModalOpen(true);
+                    }}
+                    disabled={busy}
+                  />
+                  <Button
+                    icon={DeleteIcon}
+                    variant="plain"
+                    tone="critical"
+                    accessibilityLabel="Remove rate"
+                    onClick={removeCarrierRate}
+                    disabled={busy}
+                  />
+                </div>
+              ) : null}
+              <Button
+                variant="plain"
+                onClick={function openCarrier() {
+                  setCarrierModalOpen(true);
+                }}
+                disabled={busy}
+              >
+                + Set rate
+              </Button>
+            </BlockStack>
+          </RuleFormSection>
+        ) : (
+          <>
+            <RuleFormSection
+              label="Then"
+              help="Actions run in order when the conditions match. A later rename overwrites an earlier one."
+              divider
+            >
+              {renderActionChips(0)}
+              <InlineStack gap="300">
+                <Button
+                  variant="plain"
+                  onClick={function add() {
+                    openActionModal(0, "create");
+                  }}
+                  disabled={busy}
+                >
+                  + Add action
+                </Button>
+              </InlineStack>
+            </RuleFormSection>
+
+            <div className="sm-else-connector">
+              <Text as="span" variant="bodySm" tone="subdued">
+                When the conditions do not match:
+              </Text>
+            </div>
+
+            <RuleFormSection label="Else" help="Optional actions that run when the conditions do not match.">
+              {renderActionChips(1)}
+              <InlineStack gap="300">
+                <Button
+                  variant="plain"
+                  onClick={function add() {
+                    openActionModal(1, "create");
+                  }}
+                  disabled={busy}
+                >
+                  + Add else action
+                </Button>
+              </InlineStack>
+            </RuleFormSection>
+          </>
+        )}
 
         <Box
           borderBlockStartWidth="025"
@@ -350,6 +624,41 @@ export default function RuleForm({
           </InlineStack>
         </Box>
       </BlockStack>
+
+      <ActionModal
+        open={actionModal.open}
+        mode={actionModal.editMode}
+        kind={kind}
+        allowKindChange={!actionsLocked}
+        initialFunction={
+          actionModal.editMode === "edit" && typeof actionModal.index === "number"
+            ? (actionModal.branch === 0 ? thenDrafts : elseDrafts)[actionModal.index]
+            : undefined
+        }
+        onClose={function close() {
+          setActionModal(CLOSED_ACTION_MODAL);
+        }}
+        onSaved={handleActionModalSaved}
+      />
+      {kind === "CARRIER_RATE" ? (
+        <ActionModal
+          open={carrierModalOpen}
+          mode={carrierDraft.serviceName.trim() !== "" ? "edit" : "create"}
+          kind="CARRIER_RATE"
+          initialCarrier={carrierDraft}
+          onClose={function close() {
+            setCarrierModalOpen(false);
+          }}
+          onSaved={function saveCarrier(payload: {
+            kind: RuleKind;
+            carrierDraft: CarrierDraft;
+          }) {
+            setCarrierDraft(payload.carrierDraft);
+            setCarrierModalOpen(false);
+          }}
+        />
+      ) : null}
     </Card>
   );
 }
+

@@ -12,7 +12,7 @@
  * checkout run — no redeploy needed for config changes.
  */
 
-import prisma from "../db.server";
+import prisma, { updatePrefs } from "../db.server";
 import { authenticate } from "../shopify.server";
 import {
   type Condition,
@@ -28,14 +28,15 @@ type AdminApiClient = Awaited<ReturnType<typeof authenticate.admin>>["admin"];
 import {
   PostalRuleSchema,
   ConditionGroupSchema,
-  ActionSchema,
+  normalizeFunctionActions,
+  type FunctionRuleActions,
   type RuleAction,
 } from "./config-schema";
 import { z } from "zod";
 import { SET_FUNCTION_METAFIELDS } from "../graphql/metafields";
 import { collectTags, MAX_TAGS_PER_LIST, type TagTruncation } from "./tag-collection";
 import { SOFT_CAP_BYTES } from "./budget";
-import type { WireCondition, WireConditionGroup, WireConditionField, WireOperator, WireZone } from "./rule-evaluation";
+import type { WireCondition, WireConditionGroup, WireConditionField, WireOperator, WireZone, WireAction } from "./rule-evaluation";
 import type { WirePostalRule } from "./zone-matching";
 
 // ---------------------------------------------------------------------------
@@ -78,13 +79,19 @@ const POSTAL_MODE_TO_WIRE: Record<string, "E" | "P" | "R" | "C"> = {
 
 const CONDITION_FIELD_TO_WIRE: Record<string, WireConditionField> = {
   subtotal: "subtotal",
+  total: "total",
   weight: "weight",
   quantity: "quantity",
+  price: "price",
   product_tag: "ptag",
   sku: "sku",
   vendor: "vendor",
   customer_tag: "ctag",
   logged_in: "auth",
+  city: "city",
+  date: "date",
+  day_of_week: "dow",
+  time_of_day: "tod",
 };
 
 const OPERATOR_TO_WIRE: Record<string, WireOperator> = {
@@ -104,11 +111,19 @@ const OPERATOR_TO_WIRE: Record<string, WireOperator> = {
  * postal are NOT mirrored as line conditions; merchants bind a zone to the
  * rule instead. Collection conditions are deferred (spec 006 open question 3).
  */
-const FUNCTION_UNSUPPORTED_FIELDS = new Set([
+const ZONE_HANDLED_FIELDS = new Set([
   "destination_country",
   "destination_province",
   "destination_postal",
 ]);
+
+/**
+ * Spec 021 §9.3: checkout Functions are pure (no clock), so date and time
+ * conditions can never evaluate in the Function lane. Rules using them are
+ * excluded from the mirror with an explicit reason; they still run in the
+ * carrier lane and the simulator (both have a server clock + shop timezone).
+ */
+const CLOCK_ONLY_FIELDS = new Set(["date", "day_of_week", "time_of_day"]);
 
 function toWireConditionGroup(raw: string): WireConditionGroup | undefined {
   const group = parseStoredJson(raw, ConditionGroupSchema);
@@ -138,14 +153,14 @@ function convertGroup(group: ConditionGroup): WireConditionGroup | undefined {
     }
     nodes.push({ f: field, q: operator, v: condition.value });
   }
-  return nodes.length > 0 ? { o: group.combinator === "OR" ? "O" : "A", n: nodes } : undefined;
+  return nodes.length > 0 ? { o: group.combinator === "OR" ? "O" : group.combinator === "NONE" ? "N" : "A", n: nodes } : undefined;
 }
 
-function groupUsesUnsupportedFields(group: ConditionGroup): boolean {
+function groupUsesFields(group: ConditionGroup, fields: Set<string>): boolean {
   return group.conditions.some((node) =>
     "combinator" in node
-      ? groupUsesUnsupportedFields(node as ConditionGroup)
-      : FUNCTION_UNSUPPORTED_FIELDS.has((node as Condition).field),
+      ? groupUsesFields(node as ConditionGroup, fields)
+      : fields.has((node as Condition).field),
   );
 }
 
@@ -251,14 +266,27 @@ export async function buildFunctionConfig(
       excluded.push({ ruleId: rule.id, reason: "conditions failed schema validation" });
       continue;
     }
-    if (groupUsesUnsupportedFields(conditions)) {
+    if (groupUsesFields(conditions, ZONE_HANDLED_FIELDS)) {
       excluded.push({ ruleId: rule.id, reason: "uses destination/collection conditions not supported by the Function lane" });
       continue;
     }
-    let action: RuleAction;
+    if (groupUsesFields(conditions, CLOCK_ONLY_FIELDS)) {
+      excluded.push({
+        ruleId: rule.id,
+        reason:
+          "uses date and time conditions that the checkout Function cannot evaluate (no clock); the rule still runs in the carrier lane and the simulator",
+      });
+      continue;
+    }
+    let actions: FunctionRuleActions;
     try {
-      action = parseStoredJson(rule.action, ActionSchema);
+      // Accepts the spec 021 wrapper AND legacy single-action rows.
+      actions = normalizeFunctionActions(JSON.parse(rule.action));
     } catch {
+      excluded.push({ ruleId: rule.id, reason: "action failed schema validation" });
+      continue;
+    }
+    if (actions.actions.length === 0) {
       excluded.push({ ruleId: rule.id, reason: "action failed schema validation" });
       continue;
     }
@@ -276,6 +304,13 @@ export async function buildFunctionConfig(
     const zoneRef = rule.zoneId ? zoneIdToIndex.get(rule.zoneId) : undefined;
     const wireId = `r${wireRules.length + 1}`;
 
+    const wireThen = actions.actions.map(function toWire(action) {
+      return toWireAction(action, rule.kind);
+    });
+    const wireElse = actions.elseActions.map(function toWire(action) {
+      return toWireAction(action, rule.kind);
+    });
+
     wireRules.push({
       i: wireId,
       k: kind,
@@ -283,12 +318,8 @@ export async function buildFunctionConfig(
       s: rule.stopOnMatch ? 1 : 0,
       ...(zoneRef ? { z: zoneRef } : {}),
       ...(wireGroup ? { c: wireGroup } : {}),
-      a: {
-        ...(action.target?.method ? { m: action.target.method } : {}),
-        ...(action.target?.titleContains ? { tc: action.target.titleContains } : {}),
-        ...(rule.kind === "RENAME" && action.title ? { ti: action.title } : {}),
-        ...(rule.kind === "MOVE" && typeof action.position === "number" ? { ix: action.position } : {}),
-      },
+      as: wireThen,
+      ...(wireElse.length > 0 ? { ea: wireElse } : {}),
     });
     mirrored.push({ wireId, ruleId: rule.id });
   }
@@ -330,6 +361,22 @@ export async function buildFunctionConfig(
   };
 }
 
+/** Stored function action → compact wire action (spec 020 rank/invert + 021 branches). */
+function toWireAction(action: RuleAction, kind: string): WireAction {
+  return {
+    ...(action.target?.method ? { m: action.target.method } : {}),
+    ...(action.target?.titleContains ? { tc: action.target.titleContains } : {}),
+    ...(kind === "RENAME" && action.title ? { ti: action.title } : {}),
+    ...(kind === "MOVE" && typeof action.position === "number" ? { ix: action.position } : {}),
+    ...(action.target?.rank === "CHEAPEST"
+      ? { rk: "C" as const }
+      : action.target?.rank === "MOST_EXPENSIVE"
+        ? { rk: "E" as const }
+        : {}),
+    ...(action.target?.invert ? { iv: 1 as const } : {}),
+  };
+}
+
 function safeJsonArray(raw: string): string[] {
   try {
     const parsed = JSON.parse(raw);
@@ -358,6 +405,38 @@ export interface SyncResult {
   syncedAt: string;
 }
 
+/** Shop timezone for date/time conditions (spec 021 §9.3) — one field read. */
+const SHOP_TIMEZONE_QUERY = `
+  query ShopTimezone {
+    shop {
+      ianaTimezone
+    }
+  }
+`;
+
+/** Wall-clock "now" in a shop timezone as YYYY-MM-DDTHH:mm (no seconds). */
+export function nowLocalIn(timezone: string | null | undefined): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone && timezone.trim() !== "" ? timezone : "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  // Read parts BY TYPE — Node's en-CA keeps the date as one token when the
+  // formatted string is split, so index-based parsing is not portable.
+  const parts = formatter.formatToParts(new Date());
+  function part(type: Intl.DateTimeFormatPartTypes): string {
+    return parts.find(function byType(entry) {
+      return entry.type === type;
+    })?.value ?? "";
+  }
+  const hour = part("hour") === "24" ? "00" : part("hour");
+  return `${part("year")}-${part("month")}-${part("day")}T${hour}:${part("minute")}`;
+}
+
 export async function pushFunctionConfig(
   admin: AdminApiClient,
   shopId: string,
@@ -368,6 +447,18 @@ export async function pushFunctionConfig(
   }
 
   const built = await buildFunctionConfig(shopId);
+
+  // Spec 021 §9.3: refresh the shop timezone so date/time conditions in the
+  // carrier lane and simulator stay aligned with the shop's setting.
+  try {
+    const tzResponse = await admin.graphql(SHOP_TIMEZONE_QUERY);
+    const tzJson = (await tzResponse.json()) as { data?: { shop?: { ianaTimezone?: string | null } } };
+    const ianaTimezone = tzJson.data?.shop?.ianaTimezone ?? null;
+    await updatePrefs(shopId, { ianaTimezone: ianaTimezone ?? "" });
+  } catch {
+    // Non-fatal: lanes fall back to the stored value, then UTC.
+  }
+
   const metafields = [
     ...built.metafieldValues.map((entry) => ({
       ownerId: shop.functionOwnerId!,
